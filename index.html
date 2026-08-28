@@ -6,6 +6,7 @@
   <title>Painel de Inventários e Ajustes de Estoque</title>
   <script src="https://cdn.tailwindcss.com"></script>
   <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/chartjs-plugin-datalabels@2.2.0/dist/chartjs-plugin-datalabels.min.js"></script>
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet" />
   <script>
     tailwind.config = {
@@ -41,17 +42,18 @@
   </div>
 
   <header class="sticky top-0 z-40 bg-white/95 backdrop-blur border-b border-slate-200">
-    <div class="max-w-7xl mx-auto px-3 sm:px-4 py-3 flex items-center justify-between gap-3">
-      <div class="flex items-center gap-2.5 min-w-0">
-        <div class="w-8 h-8 rounded-xl bg-brand-600 flex items-center justify-center text-white font-bold text-xs shrink-0">IE</div>
+    <div class="max-w-7xl mx-auto px-2 sm:px-3 sm:px-4 py-2 sm:py-3 flex items-center justify-between gap-2 sm:gap-3">
+      <div class="flex items-center gap-2 sm:gap-2.5 min-w-0">
+        <div class="w-7 h-7 sm:w-8 sm:h-8 rounded-xl bg-brand-600 flex items-center justify-center shrink-0">
+          <img src="https://img.icons8.com/?size=100&id=48370&format=png&color=FFFFFF" alt="Inventário" class="w-4 h-4 sm:w-5 sm:h-5" />
+        </div>
         <div class="min-w-0">
-          <h1 class="text-sm font-bold text-slate-900 truncate">Inventários & Ajustes</h1>
-          <p class="text-[10px] text-slate-500 truncate" id="header-sub">—</p>
+          <h1 class="text-xs sm:text-sm font-bold text-slate-900 truncate">Inventários & Ajustes</h1>
         </div>
       </div>
-      <div class="flex items-center gap-2">
+      <div class="flex items-center gap-1 sm:gap-2">
         <button id="btn-export" class="hidden sm:inline-flex items-center gap-1 px-2.5 py-1.5 text-xs font-medium rounded-lg border border-slate-200 bg-white hover:bg-slate-50 text-slate-600">Exportar</button>
-        <button id="btn-filters" class="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold rounded-lg bg-brand-600 text-white hover:bg-brand-700 shadow-sm">
+        <button id="btn-filters" class="inline-flex items-center gap-1 sm:gap-1.5 px-2 sm:px-3 py-1.5 text-xs font-semibold rounded-lg bg-brand-600 text-white hover:bg-brand-700 shadow-sm">
           Filtros
           <span id="filter-badge" class="hidden ml-0.5 px-1.5 py-0.5 text-[10px] rounded-full bg-white/25">0</span>
         </button>
@@ -59,45 +61,45 @@
     </div>
   </header>
 
-  <main class="max-w-7xl mx-auto px-3 sm:px-4 py-4 space-y-4 pb-20">
+  <main class="max-w-7xl mx-auto px-2 sm:px-3 sm:px-4 py-3 sm:py-4 space-y-3 sm:space-y-4 pb-20">
 
     <div id="active-filters" class="flex flex-wrap gap-1.5 empty:hidden"></div>
 
     <section class="grid grid-cols-2 lg:grid-cols-4 gap-3">
-      <div class="bg-white rounded-2xl border border-slate-200 p-4 shadow-sm">
+      <div class="bg-white rounded-2xl border border-slate-200 p-3 sm:p-4 shadow-sm">
         <p class="text-[10px] font-semibold text-slate-400 uppercase tracking-wider">Total</p>
-        <p id="kpi-total" class="mt-1 text-xl font-bold tabular-nums">—</p>
+        <p id="kpi-total" class="mt-1 text-lg sm:text-xl font-bold tabular-nums">—</p>
       </div>
-      <div class="bg-white rounded-2xl border border-slate-200 p-4 shadow-sm">
+      <div class="bg-white rounded-2xl border border-slate-200 p-3 sm:p-4 shadow-sm">
         <p class="text-[10px] font-semibold text-slate-400 uppercase tracking-wider">Ajuste Normal</p>
-        <p id="kpi-normal" class="mt-1 text-xl font-bold tabular-nums">—</p>
+        <p id="kpi-normal" class="mt-1 text-lg sm:text-xl font-bold tabular-nums">—</p>
       </div>
-      <div class="bg-white rounded-2xl border border-slate-200 p-4 shadow-sm">
+      <div class="bg-white rounded-2xl border border-slate-200 p-3 sm:p-4 shadow-sm">
         <p class="text-[10px] font-semibold text-slate-400 uppercase tracking-wider">TOP20</p>
-        <p id="kpi-top20" class="mt-1 text-xl font-bold tabular-nums">—</p>
+        <p id="kpi-top20" class="mt-1 text-lg sm:text-xl font-bold tabular-nums">—</p>
       </div>
-      <div class="bg-white rounded-2xl border border-slate-200 p-4 shadow-sm">
+      <div class="bg-white rounded-2xl border border-slate-200 p-3 sm:p-4 shadow-sm">
         <p class="text-[10px] font-semibold text-slate-400 uppercase tracking-wider">Inv. Departamental</p>
-        <p id="kpi-inv" class="mt-1 text-xl font-bold tabular-nums">—</p>
+        <p id="kpi-inv" class="mt-1 text-lg sm:text-xl font-bold tabular-nums">—</p>
       </div>
     </section>
 
-    <section class="bg-white rounded-2xl border border-slate-200 p-4 shadow-sm">
-      <div class="flex items-center justify-between mb-3 gap-2 flex-wrap">
+    <section class="bg-white rounded-2xl border border-slate-200 p-3 sm:p-4 shadow-sm">
+      <div class="flex items-center justify-between mb-2 sm:mb-3 gap-2 flex-wrap">
         <h2 class="text-sm font-semibold text-slate-800">Evolução Temporal</h2>
         <div class="flex flex-wrap gap-1">
-          <button data-evol="ALL" class="evol-btn chip-active px-2.5 py-1 text-[11px] font-medium rounded-lg">Total</button>
-          <button data-evol="N" class="evol-btn px-2.5 py-1 text-[11px] font-medium rounded-lg bg-slate-100 text-slate-600">Normal</button>
-          <button data-evol="T" class="evol-btn px-2.5 py-1 text-[11px] font-medium rounded-lg bg-slate-100 text-slate-600">TOP20</button>
-          <button data-evol="I" class="evol-btn px-2.5 py-1 text-[11px] font-medium rounded-lg bg-slate-100 text-slate-600">Inv. Dept.</button>
+          <button data-evol="ALL" class="evol-btn chip-active px-2 py-1 sm:px-2.5 text-[10px] sm:text-[11px] font-medium rounded-lg">Total</button>
+          <button data-evol="N" class="evol-btn px-2 py-1 sm:px-2.5 text-[10px] sm:text-[11px] font-medium rounded-lg bg-slate-100 text-slate-600">Normal</button>
+          <button data-evol="T" class="evol-btn px-2 py-1 sm:px-2.5 text-[10px] sm:text-[11px] font-medium rounded-lg bg-slate-100 text-slate-600">TOP20</button>
+          <button data-evol="I" class="evol-btn px-2 py-1 sm:px-2.5 text-[10px] sm:text-[11px] font-medium rounded-lg bg-slate-100 text-slate-600">Inv. Dept.</button>
         </div>
       </div>
-      <div class="h-52 sm:h-60"><canvas id="chart-evolucao"></canvas></div>
+      <div class="h-48 sm:h-52 lg:h-60"><canvas id="chart-evolucao"></canvas></div>
     </section>
 
-    <div class="grid grid-cols-1 lg:grid-cols-2 gap-4">
+    <div class="grid grid-cols-1 lg:grid-cols-2 gap-3 sm:gap-4">
       <section class="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden">
-        <div class="px-4 py-3 border-b border-slate-100 flex items-center justify-between gap-2">
+        <div class="px-3 sm:px-4 py-2 sm:py-3 border-b border-slate-100 flex items-center justify-between gap-2">
           <h2 class="text-sm font-semibold text-slate-800">Lojas</h2>
           <select id="sort-lojas" class="text-[11px] border border-slate-200 rounded-lg px-2 py-1 bg-white">
             <option value="total_asc">Pior total</option>
@@ -105,11 +107,11 @@
             <option value="nome">Nome</option>
           </select>
         </div>
-        <div class="px-3 py-2 overflow-x-auto">
-          <table class="w-full text-left min-w-[480px]">
+        <div class="px-2 sm:px-3 py-2 overflow-x-auto">
+          <table class="w-full text-left min-w-[380px] sm:min-w-[480px]">
             <thead>
               <tr class="text-[10px] text-slate-400 uppercase">
-                <th class="pb-2 font-medium pl-1">Loja</th>
+                <th class="pb-2 font-medium pl-1 text-center">Loja</th>
                 <th class="pb-2 font-medium text-right">Normal</th>
                 <th class="pb-2 font-medium text-right">TOP20</th>
                 <th class="pb-2 font-medium text-right">Inv.</th>
@@ -122,14 +124,14 @@
       </section>
 
       <section class="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden">
-        <div class="px-4 py-3 border-b border-slate-100">
+        <div class="px-3 sm:px-4 py-2 sm:py-3 border-b border-slate-100">
           <h2 class="text-sm font-semibold text-slate-800">Departamentos</h2>
         </div>
-        <div class="px-3 py-2 overflow-x-auto">
-          <table class="w-full text-left min-w-[420px]">
+        <div class="px-2 sm:px-3 py-2 overflow-x-auto">
+          <table class="w-full text-left min-w-[360px] sm:min-w-[420px]">
             <thead>
               <tr class="text-[10px] text-slate-400 uppercase">
-                <th class="pb-2 font-medium pl-1">Depto</th>
+                <th class="pb-2 font-medium pl-1 text-center">Depto</th>
                 <th class="pb-2 font-medium text-right">Normal</th>
                 <th class="pb-2 font-medium text-right">TOP20</th>
                 <th class="pb-2 font-medium text-right">Inv.</th>
@@ -143,14 +145,14 @@
     </div>
 
     <section class="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden">
-      <div class="px-4 py-3 border-b border-slate-100">
+      <div class="px-3 sm:px-4 py-2 sm:py-3 border-b border-slate-100">
         <h2 class="text-sm font-semibold text-slate-800">Regionais</h2>
       </div>
-      <div class="px-3 py-2 overflow-x-auto">
-        <table class="w-full text-left min-w-[480px]">
+      <div class="px-2 sm:px-3 py-2 overflow-x-auto">
+        <table class="w-full text-left min-w-[380px] sm:min-w-[480px]">
           <thead>
             <tr class="text-[10px] text-slate-400 uppercase">
-              <th class="pb-2 font-medium pl-1">Regional</th>
+              <th class="pb-2 font-medium pl-1 text-center">Regional</th>
               <th class="pb-2 font-medium text-right">Normal</th>
               <th class="pb-2 font-medium text-right">TOP20</th>
               <th class="pb-2 font-medium text-right">Inv.</th>
@@ -162,9 +164,9 @@
       </div>
     </section>
 
-    <div class="grid grid-cols-1 lg:grid-cols-2 gap-4">
+    <div class="grid grid-cols-1 lg:grid-cols-2 gap-3 sm:gap-4">
       <section class="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden">
-        <div class="px-4 py-3 border-b border-slate-100 flex items-center justify-between gap-2">
+        <div class="px-3 sm:px-4 py-2 sm:py-3 border-b border-slate-100 flex items-center justify-between gap-2">
           <h2 class="text-sm font-semibold text-falta">Maiores Faltas</h2>
           <select id="top-n-faltas" class="text-[11px] border border-slate-200 rounded-lg px-2 py-1">
             <option value="5">Top 5</option>
@@ -176,7 +178,7 @@
         <div id="rank-faltas" class="divide-y divide-slate-50 max-h-80 overflow-y-auto scrollbar-thin"></div>
       </section>
       <section class="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden">
-        <div class="px-4 py-3 border-b border-slate-100 flex items-center justify-between gap-2">
+        <div class="px-3 sm:px-4 py-2 sm:py-3 border-b border-slate-100 flex items-center justify-between gap-2">
           <h2 class="text-sm font-semibold text-sobra">Maiores Sobras</h2>
           <select id="top-n-sobras" class="text-[11px] border border-slate-200 rounded-lg px-2 py-1">
             <option value="5">Top 5</option>
@@ -193,42 +195,42 @@
 
   <div id="drawer-overlay" class="fixed inset-0 bg-black/40 z-40 hidden opacity-0 transition-opacity"></div>
   <aside id="drawer" class="drawer fixed top-0 right-0 h-full w-full max-w-sm bg-white z-50 shadow-2xl flex flex-col">
-    <div class="px-4 py-4 border-b border-slate-200 flex items-center justify-between">
+    <div class="px-3 sm:px-4 py-3 sm:py-4 border-b border-slate-200 flex items-center justify-between">
       <h2 class="font-semibold text-slate-900">Filtros</h2>
       <button id="btn-close-drawer" class="p-2 rounded-lg hover:bg-slate-100 text-slate-500">
         <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/></svg>
       </button>
     </div>
-    <div class="flex-1 overflow-y-auto p-4 space-y-4 scrollbar-thin">
+    <div class="flex-1 overflow-y-auto p-3 sm:p-4 space-y-3 sm:space-y-4 scrollbar-thin">
       <div>
         <label class="text-xs font-medium text-slate-500 uppercase">Regional</label>
-        <select id="f-regional" class="mt-1 w-full border border-slate-200 rounded-xl px-3 py-2.5 text-sm bg-white"></select>
+        <select id="f-regional" class="mt-1 w-full border border-slate-200 rounded-xl px-2.5 sm:px-3 py-2 sm:py-2.5 text-sm bg-white"></select>
       </div>
       <div>
         <label class="text-xs font-medium text-slate-500 uppercase">Loja</label>
-        <select id="f-loja" class="mt-1 w-full border border-slate-200 rounded-xl px-3 py-2.5 text-sm bg-white"></select>
+        <select id="f-loja" class="mt-1 w-full border border-slate-200 rounded-xl px-2.5 sm:px-3 py-2 sm:py-2.5 text-sm bg-white"></select>
       </div>
       <div>
         <label class="text-xs font-medium text-slate-500 uppercase">Departamento</label>
-        <select id="f-depto" class="mt-1 w-full border border-slate-200 rounded-xl px-3 py-2.5 text-sm bg-white"></select>
+        <select id="f-depto" class="mt-1 w-full border border-slate-200 rounded-xl px-2.5 sm:px-3 py-2 sm:py-2.5 text-sm bg-white"></select>
       </div>
       <div>
         <label class="text-xs font-medium text-slate-500 uppercase">Mês</label>
-        <select id="f-mes" class="mt-1 w-full border border-slate-200 rounded-xl px-3 py-2.5 text-sm bg-white"></select>
+        <select id="f-mes" class="mt-1 w-full border border-slate-200 rounded-xl px-2.5 sm:px-3 py-2 sm:py-2.5 text-sm bg-white"></select>
       </div>
-      <div class="grid grid-cols-2 gap-3">
+      <div class="grid grid-cols-2 gap-2 sm:gap-3">
         <div>
           <label class="text-xs font-medium text-slate-500 uppercase">Data inicial</label>
-          <input type="date" id="f-data-ini" class="mt-1 w-full border border-slate-200 rounded-xl px-3 py-2.5 text-sm" />
+          <input type="date" id="f-data-ini" class="mt-1 w-full border border-slate-200 rounded-xl px-2.5 sm:px-3 py-2 sm:py-2.5 text-sm" />
         </div>
         <div>
           <label class="text-xs font-medium text-slate-500 uppercase">Data final</label>
-          <input type="date" id="f-data-fim" class="mt-1 w-full border border-slate-200 rounded-xl px-3 py-2.5 text-sm" />
+          <input type="date" id="f-data-fim" class="mt-1 w-full border border-slate-200 rounded-xl px-2.5 sm:px-3 py-2 sm:py-2.5 text-sm" />
         </div>
       </div>
       <div>
         <label class="text-xs font-medium text-slate-500 uppercase">Tipo de Ajuste</label>
-        <select id="f-tipo" class="mt-1 w-full border border-slate-200 rounded-xl px-3 py-2.5 text-sm bg-white">
+        <select id="f-tipo" class="mt-1 w-full border border-slate-200 rounded-xl px-2.5 sm:px-3 py-2 sm:py-2.5 text-sm bg-white">
           <option value="">Todos</option>
           <option value="N">Ajuste Normal</option>
           <option value="T">Ajuste TOP20</option>
@@ -237,7 +239,7 @@
       </div>
       <div>
         <label class="text-xs font-medium text-slate-500 uppercase">Natureza</label>
-        <select id="f-natureza" class="mt-1 w-full border border-slate-200 rounded-xl px-3 py-2.5 text-sm bg-white">
+        <select id="f-natureza" class="mt-1 w-full border border-slate-200 rounded-xl px-2.5 sm:px-3 py-2 sm:py-2.5 text-sm bg-white">
           <option value="">Todas</option>
           <option value="S">Sobra</option>
           <option value="F">Falta</option>
@@ -245,12 +247,12 @@
       </div>
       <div>
         <label class="text-xs font-medium text-slate-500 uppercase">Produto (busca)</label>
-        <input type="text" id="f-produto" placeholder="Nome ou código..." class="mt-1 w-full border border-slate-200 rounded-xl px-3 py-2.5 text-sm" />
+        <input type="text" id="f-produto" placeholder="Nome ou código..." class="mt-1 w-full border border-slate-200 rounded-xl px-2.5 sm:px-3 py-2 sm:py-2.5 text-sm" />
       </div>
     </div>
-    <div class="p-4 border-t border-slate-200 flex gap-2">
-      <button id="btn-clear" class="flex-1 py-2.5 text-sm font-medium rounded-xl border border-slate-200 text-slate-600 hover:bg-slate-50">Limpar</button>
-      <button id="btn-apply" class="flex-1 py-2.5 text-sm font-semibold rounded-xl bg-brand-600 text-white hover:bg-brand-700">Aplicar</button>
+    <div class="p-3 sm:p-4 border-t border-slate-200 flex gap-2">
+      <button id="btn-clear" class="flex-1 py-2 sm:py-2.5 text-sm font-medium rounded-xl border border-slate-200 text-slate-600 hover:bg-slate-50">Limpar</button>
+      <button id="btn-apply" class="flex-1 py-2 sm:py-2.5 text-sm font-semibold rounded-xl bg-brand-600 text-white hover:bg-brand-700">Aplicar</button>
     </div>
   </aside>
 
@@ -258,13 +260,13 @@
     <div class="absolute inset-0 bg-black/50" id="modal-overlay"></div>
     <div class="absolute inset-x-0 bottom-0 sm:inset-0 sm:flex sm:items-center sm:justify-center p-0 sm:p-4">
       <div class="bg-white rounded-t-2xl sm:rounded-2xl w-full sm:max-w-lg max-h-[85vh] overflow-hidden flex flex-col shadow-2xl">
-        <div class="px-4 py-3 border-b border-slate-100 flex items-center justify-between">
+        <div class="px-3 sm:px-4 py-2 sm:py-3 border-b border-slate-100 flex items-center justify-between">
           <h3 class="font-semibold text-slate-900 text-sm">Detalhe do Produto</h3>
           <button id="modal-close" class="p-2 rounded-lg hover:bg-slate-100 text-slate-500">
             <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/></svg>
           </button>
         </div>
-        <div id="modal-body" class="flex-1 overflow-y-auto p-4 scrollbar-thin"></div>
+        <div id="modal-body" class="flex-1 overflow-y-auto p-3 sm:p-4 scrollbar-thin"></div>
       </div>
     </div>
   </div>

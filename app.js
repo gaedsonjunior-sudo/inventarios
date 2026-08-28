@@ -26,6 +26,12 @@
     var s = abs.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
     return n < 0 ? '-R$ ' + s : 'R$ ' + s;
   }
+  function fmtMoneyCompact(n) {
+    if (n == null || isNaN(n)) return '—';
+    var abs = Math.abs(n);
+    var s = Math.floor(abs).toLocaleString('pt-BR');
+    return s;
+  }
   function moneyClass(n) {
     if (n < 0) return 'text-falta';
     if (n > 0) return 'text-sobra';
@@ -74,9 +80,6 @@
           };
         });
         el('loading').style.display = 'none';
-        if (idbData) {
-          el('header-sub').textContent = (META.regionais && META.regionais[0] || '') + ' · base atualizada localmente';
-        }
         initFilters();
         applyFilters();
       } catch (err) {
@@ -106,9 +109,6 @@
       el('f-data-fim').max = META.data_max;
       el('f-data-ini').max = META.data_max;
       el('f-data-fim').min = META.data_min;
-    }
-    if (!el('header-sub').textContent || el('header-sub').textContent === '—') {
-      el('header-sub').textContent = (META.regionais && META.regionais[0] || '') + ' · ' + (META.total || 0).toLocaleString('pt-BR') + ' lançamentos';
     }
   }
 
@@ -305,6 +305,7 @@
 
     var ctx = el('chart-evolucao').getContext('2d');
     if (chart) chart.destroy();
+    Chart.register(ChartDataLabels);
     chart = new Chart(ctx, {
       type: 'bar',
       data: {
@@ -327,6 +328,21 @@
             callbacks: {
               label: function (ctx) { return label + ': ' + fmtMoney(ctx.parsed.y); }
             }
+          },
+          datalabels: {
+            anchor: 'end',
+            align: 'end',
+            color: '#374151',
+            font: {
+              size: 10,
+              weight: 'bold'
+            },
+            formatter: function (value) {
+              return fmtMoney(value);
+            },
+            display: function (context) {
+              return context.dataset.data[context.dataIndex] !== 0;
+            }
           }
         },
         scales: {
@@ -345,7 +361,7 @@
   }
 
   function cellMoney(v) {
-    return '<td class="py-2 text-right text-xs font-semibold tabular-nums ' + moneyClass(v) + '">' + fmtMoney(v) + '</td>';
+    return '<td class="py-2 text-right text-xs font-semibold tabular-nums ' + moneyClass(v) + '">' + fmtMoneyCompact(v) + '</td>';
   }
 
   function renderLojas(agg) {
@@ -359,7 +375,7 @@
       return '<tr class="border-t border-slate-50 hover:bg-slate-50 cursor-pointer" data-filter-loja="' + l.loja + '">' +
         '<td class="py-2 pl-1 text-sm font-medium text-slate-800">' + l.loja + '</td>' +
         cellMoney(l.N) + cellMoney(l.T) + cellMoney(l.I) +
-        '<td class="py-2 pr-1 text-right text-xs font-bold tabular-nums ' + moneyClass(l.total) + '">' + fmtMoney(l.total) + '</td></tr>';
+        '<td class="py-2 pr-1 text-right text-xs font-bold tabular-nums ' + moneyClass(l.total) + '">' + fmtMoneyCompact(l.total) + '</td></tr>';
     }).join('') || '<tr><td colspan="5" class="py-4 text-sm text-slate-400 text-center">Nenhum dado</td></tr>';
 
     el('rank-lojas').querySelectorAll('[data-filter-loja]').forEach(function (row) {
@@ -377,7 +393,7 @@
       return '<tr class="border-t border-slate-50 hover:bg-slate-50 cursor-pointer" data-filter-depto="' + d.depto + '">' +
         '<td class="py-2 pl-1 text-sm font-medium text-slate-800">' + d.depto + '</td>' +
         cellMoney(d.N) + cellMoney(d.T) + cellMoney(d.I) +
-        '<td class="py-2 pr-1 text-right text-xs font-bold tabular-nums ' + moneyClass(d.total) + '">' + fmtMoney(d.total) + '</td></tr>';
+        '<td class="py-2 pr-1 text-right text-xs font-bold tabular-nums ' + moneyClass(d.total) + '">' + fmtMoneyCompact(d.total) + '</td></tr>';
     }).join('') || '<tr><td colspan="5" class="py-4 text-sm text-slate-400 text-center">Nenhum dado</td></tr>';
 
     el('rank-deptos').querySelectorAll('[data-filter-depto]').forEach(function (row) {
@@ -396,7 +412,7 @@
         '<td class="py-2 pl-1 text-sm font-medium text-slate-800">' + r.regional +
         ' <span class="text-[10px] text-slate-400 font-normal">(' + r.nLojas + ' lojas)</span></td>' +
         cellMoney(r.N) + cellMoney(r.T) + cellMoney(r.I) +
-        '<td class="py-2 pr-1 text-right text-xs font-bold tabular-nums ' + moneyClass(r.total) + '">' + fmtMoney(r.total) + '</td></tr>';
+        '<td class="py-2 pr-1 text-right text-xs font-bold tabular-nums ' + moneyClass(r.total) + '">' + fmtMoneyCompact(r.total) + '</td></tr>';
     }).join('') || '<tr><td colspan="5" class="py-4 text-sm text-slate-400 text-center">Nenhum dado</td></tr>';
 
     el('rank-regionais').querySelectorAll('[data-filter-reg]').forEach(function (row) {
