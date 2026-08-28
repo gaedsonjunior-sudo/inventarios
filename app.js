@@ -330,12 +330,9 @@
             }
           },
           datalabels: {
-            anchor: function (context) {
-              return context.dataset.data[context.dataIndex] < 0 ? 'end' : 'start';
-            },
-            align: function (context) {
-              return context.dataset.data[context.dataIndex] < 0 ? 'bottom' : 'top';
-            },
+            anchor: 'end',
+            align: 'end',
+            offset: -2,
             color: '#374151',
             font: {
               size: 10,
