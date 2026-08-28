@@ -1,0 +1,274 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
+  <title>Painel de Inventários e Ajustes de Estoque</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/pako@2.1.0/dist/pako.min.js"></script>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet" />
+  <script>
+    tailwind.config = {
+      theme: {
+        extend: {
+          fontFamily: { sans: ['Inter', 'system-ui', 'sans-serif'] },
+          colors: {
+            brand: { 50:'#f0f9ff',100:'#e0f2fe',500:'#0ea5e9',600:'#0284c7',700:'#0369a1',900:'#0c4a6e' },
+            sobra: { DEFAULT: '#10b981', light: '#d1fae5', dark: '#059669' },
+            falta: { DEFAULT: '#ef4444', light: '#fee2e2', dark: '#dc2626' },
+          }
+        }
+      }
+    }
+  </script>
+  <style>
+    body { font-family: Inter, system-ui, sans-serif; }
+    .scrollbar-thin::-webkit-scrollbar { width: 6px; height: 6px; }
+    .scrollbar-thin::-webkit-scrollbar-thumb { background: #cbd5e1; border-radius: 3px; }
+    .card-hover { transition: transform .15s, box-shadow .15s; }
+    .card-hover:active { transform: scale(0.98); }
+    @media (hover:hover) { .card-hover:hover { transform: translateY(-2px); box-shadow: 0 8px 25px -5px rgb(0 0 0 / 0.1); } }
+    .drawer { transform: translateX(100%); transition: transform .3s ease; }
+    .drawer.open { transform: translateX(0); }
+    .fade-in { animation: fadeIn .3s ease; }
+    @keyframes fadeIn { from { opacity: 0; transform: translateY(8px); } to { opacity: 1; transform: none; } }
+    .spinner { border: 3px solid #e2e8f0; border-top-color: #0ea5e9; border-radius: 50%; width: 40px; height: 40px; animation: spin .8s linear infinite; }
+    @keyframes spin { to { transform: rotate(360deg); } }
+    table th { position: sticky; top: 0; background: #f8fafc; z-index: 1; }
+  </style>
+</head>
+<body class="bg-slate-50 text-slate-800 antialiased min-h-screen">
+
+  <!-- Loading -->
+  <div id="loading" class="fixed inset-0 bg-white z-50 flex flex-col items-center justify-center gap-4">
+    <div class="spinner"></div>
+    <p class="text-slate-500 text-sm font-medium">Carregando base de inventários...</p>
+    <p id="load-pct" class="text-xs text-slate-400"></p>
+  </div>
+
+  <!-- Header -->
+  <header class="sticky top-0 z-40 bg-white/90 backdrop-blur border-b border-slate-200">
+    <div class="max-w-7xl mx-auto px-4 py-3 flex items-center justify-between gap-3">
+      <div class="flex items-center gap-3 min-w-0">
+        <div class="w-9 h-9 rounded-xl bg-brand-600 flex items-center justify-center text-white font-bold text-sm shrink-0">IE</div>
+        <div class="min-w-0">
+          <h1 class="text-sm sm:text-base font-bold text-slate-900 truncate">Inventários & Ajustes</h1>
+          <p class="text-[11px] text-slate-500 truncate" id="header-sub">Regional 7 · Lins</p>
+        </div>
+      </div>
+      <div class="flex items-center gap-2">
+        <button id="btn-export" class="hidden sm:inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium rounded-lg border border-slate-200 bg-white hover:bg-slate-50 text-slate-600">
+          <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4"/></svg>
+          Exportar
+        </button>
+        <button id="btn-filters" class="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold rounded-lg bg-brand-600 text-white hover:bg-brand-700 shadow-sm">
+          <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 4a1 1 0 011-1h16a1 1 0 011 1v2.586a1 1 0 01-.293.707l-6.414 6.414a1 1 0 00-.293.707V17l-4 4v-6.586a1 1 0 00-.293-.707L3.293 7.293A1 1 0 013 6.586V4z"/></svg>
+          Filtros
+          <span id="filter-badge" class="hidden ml-0.5 px-1.5 py-0.5 text-[10px] rounded-full bg-white/20">0</span>
+        </button>
+      </div>
+    </div>
+  </header>
+
+  <!-- Main -->
+  <main class="max-w-7xl mx-auto px-3 sm:px-4 py-4 sm:py-6 space-y-5 pb-24">
+
+    <!-- Active filters chips -->
+    <div id="active-filters" class="flex flex-wrap gap-2 empty:hidden"></div>
+
+    <!-- KPI Cards -->
+    <section class="grid grid-cols-2 lg:grid-cols-3 xl:grid-cols-6 gap-3">
+      <div class="bg-white rounded-2xl border border-slate-200 p-4 shadow-sm">
+        <p class="text-[11px] font-medium text-slate-500 uppercase tracking-wide">Sobras</p>
+        <p id="kpi-sobras" class="mt-1 text-lg sm:text-xl font-bold text-sobra tabular-nums">—</p>
+      </div>
+      <div class="bg-white rounded-2xl border border-slate-200 p-4 shadow-sm">
+        <p class="text-[11px] font-medium text-slate-500 uppercase tracking-wide">Faltas</p>
+        <p id="kpi-faltas" class="mt-1 text-lg sm:text-xl font-bold text-falta tabular-nums">—</p>
+      </div>
+      <div class="bg-white rounded-2xl border border-slate-200 p-4 shadow-sm col-span-2 lg:col-span-1">
+        <p class="text-[11px] font-medium text-slate-500 uppercase tracking-wide">Resultado Líquido</p>
+        <p id="kpi-resultado" class="mt-1 text-lg sm:text-xl font-bold tabular-nums">—</p>
+      </div>
+      <div class="bg-white rounded-2xl border border-slate-200 p-4 shadow-sm">
+        <p class="text-[11px] font-medium text-slate-500 uppercase tracking-wide">Lançamentos</p>
+        <p id="kpi-lanc" class="mt-1 text-lg sm:text-xl font-bold text-slate-800 tabular-nums">—</p>
+      </div>
+      <div class="bg-white rounded-2xl border border-slate-200 p-4 shadow-sm">
+        <p class="text-[11px] font-medium text-slate-500 uppercase tracking-wide">Lojas</p>
+        <p id="kpi-lojas" class="mt-1 text-lg sm:text-xl font-bold text-slate-800 tabular-nums">—</p>
+      </div>
+      <div class="bg-white rounded-2xl border border-slate-200 p-4 shadow-sm">
+        <p class="text-[11px] font-medium text-slate-500 uppercase tracking-wide">Produtos</p>
+        <p id="kpi-produtos" class="mt-1 text-lg sm:text-xl font-bold text-slate-800 tabular-nums">—</p>
+      </div>
+    </section>
+
+    <!-- Tipos de ajuste -->
+    <section class="bg-white rounded-2xl border border-slate-200 p-4 shadow-sm">
+      <h2 class="text-sm font-semibold text-slate-800 mb-3">Por Tipo de Ajuste</h2>
+      <div id="tipos-grid" class="grid grid-cols-1 sm:grid-cols-3 gap-3"></div>
+    </section>
+
+    <!-- Evolução temporal -->
+    <section class="bg-white rounded-2xl border border-slate-200 p-4 shadow-sm">
+      <div class="flex items-center justify-between mb-3 gap-2 flex-wrap">
+        <h2 class="text-sm font-semibold text-slate-800">Evolução Temporal</h2>
+        <div class="flex gap-1 bg-slate-100 rounded-lg p-0.5">
+          <button data-metric="v" class="metric-btn px-3 py-1 text-xs font-medium rounded-md bg-white shadow text-slate-800">R$</button>
+          <button data-metric="q" class="metric-btn px-3 py-1 text-xs font-medium rounded-md text-slate-500">Qtde</button>
+        </div>
+      </div>
+      <div class="h-56 sm:h-64">
+        <canvas id="chart-evolucao"></canvas>
+      </div>
+    </section>
+
+    <!-- Rankings row -->
+    <div class="grid grid-cols-1 lg:grid-cols-2 gap-4">
+      <!-- Lojas -->
+      <section class="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden">
+        <div class="px-4 py-3 border-b border-slate-100 flex items-center justify-between">
+          <h2 class="text-sm font-semibold text-slate-800">Ranking de Lojas</h2>
+          <select id="sort-lojas" class="text-xs border border-slate-200 rounded-lg px-2 py-1 bg-white">
+            <option value="resultado_asc">Pior resultado</option>
+            <option value="resultado_desc">Melhor resultado</option>
+            <option value="faltas_asc">Maior falta</option>
+            <option value="sobras_desc">Maior sobra</option>
+          </select>
+        </div>
+        <div id="rank-lojas" class="divide-y divide-slate-50 max-h-80 overflow-y-auto scrollbar-thin"></div>
+      </section>
+
+      <!-- Departamentos -->
+      <section class="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden">
+        <div class="px-4 py-3 border-b border-slate-100">
+          <h2 class="text-sm font-semibold text-slate-800">Departamentos</h2>
+        </div>
+        <div id="rank-deptos" class="divide-y divide-slate-50"></div>
+      </section>
+    </div>
+
+    <!-- Maiores Faltas / Sobras -->
+    <div class="grid grid-cols-1 lg:grid-cols-2 gap-4">
+      <section class="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden">
+        <div class="px-4 py-3 border-b border-slate-100 flex items-center justify-between gap-2">
+          <h2 class="text-sm font-semibold text-falta">Maiores Faltas</h2>
+          <select id="top-n-faltas" class="text-xs border border-slate-200 rounded-lg px-2 py-1">
+            <option value="5">Top 5</option>
+            <option value="10" selected>Top 10</option>
+            <option value="20">Top 20</option>
+            <option value="50">Top 50</option>
+          </select>
+        </div>
+        <div id="rank-faltas" class="divide-y divide-slate-50 max-h-96 overflow-y-auto scrollbar-thin"></div>
+      </section>
+      <section class="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden">
+        <div class="px-4 py-3 border-b border-slate-100 flex items-center justify-between gap-2">
+          <h2 class="text-sm font-semibold text-sobra">Maiores Sobras</h2>
+          <select id="top-n-sobras" class="text-xs border border-slate-200 rounded-lg px-2 py-1">
+            <option value="5">Top 5</option>
+            <option value="10" selected>Top 10</option>
+            <option value="20">Top 20</option>
+            <option value="50">Top 50</option>
+          </select>
+        </div>
+        <div id="rank-sobras" class="divide-y divide-slate-50 max-h-96 overflow-y-auto scrollbar-thin"></div>
+      </section>
+    </div>
+
+    <!-- Regionais (mesmo com 1, manter estrutura) -->
+    <section class="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden">
+      <div class="px-4 py-3 border-b border-slate-100">
+        <h2 class="text-sm font-semibold text-slate-800">Regionais</h2>
+      </div>
+      <div id="rank-regionais" class="divide-y divide-slate-50"></div>
+    </section>
+
+  </main>
+
+  <!-- Filter Drawer -->
+  <div id="drawer-overlay" class="fixed inset-0 bg-black/40 z-40 hidden opacity-0 transition-opacity"></div>
+  <aside id="drawer" class="drawer fixed top-0 right-0 h-full w-full max-w-sm bg-white z-50 shadow-2xl flex flex-col">
+    <div class="px-4 py-4 border-b border-slate-200 flex items-center justify-between">
+      <h2 class="font-semibold text-slate-900">Filtros</h2>
+      <button id="btn-close-drawer" class="p-2 rounded-lg hover:bg-slate-100 text-slate-500">
+        <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/></svg>
+      </button>
+    </div>
+    <div class="flex-1 overflow-y-auto p-4 space-y-4 scrollbar-thin">
+      <div>
+        <label class="text-xs font-medium text-slate-500 uppercase">Regional</label>
+        <select id="f-regional" class="mt-1 w-full border border-slate-200 rounded-xl px-3 py-2.5 text-sm bg-white"></select>
+      </div>
+      <div>
+        <label class="text-xs font-medium text-slate-500 uppercase">Loja</label>
+        <select id="f-loja" class="mt-1 w-full border border-slate-200 rounded-xl px-3 py-2.5 text-sm bg-white"></select>
+      </div>
+      <div>
+        <label class="text-xs font-medium text-slate-500 uppercase">Departamento</label>
+        <select id="f-depto" class="mt-1 w-full border border-slate-200 rounded-xl px-3 py-2.5 text-sm bg-white"></select>
+      </div>
+      <div>
+        <label class="text-xs font-medium text-slate-500 uppercase">Mês</label>
+        <select id="f-mes" class="mt-1 w-full border border-slate-200 rounded-xl px-3 py-2.5 text-sm bg-white"></select>
+      </div>
+      <div class="grid grid-cols-2 gap-3">
+        <div>
+          <label class="text-xs font-medium text-slate-500 uppercase">Data inicial</label>
+          <input type="date" id="f-data-ini" class="mt-1 w-full border border-slate-200 rounded-xl px-3 py-2.5 text-sm" />
+        </div>
+        <div>
+          <label class="text-xs font-medium text-slate-500 uppercase">Data final</label>
+          <input type="date" id="f-data-fim" class="mt-1 w-full border border-slate-200 rounded-xl px-3 py-2.5 text-sm" />
+        </div>
+      </div>
+      <div>
+        <label class="text-xs font-medium text-slate-500 uppercase">Tipo de Ajuste</label>
+        <select id="f-tipo" class="mt-1 w-full border border-slate-200 rounded-xl px-3 py-2.5 text-sm bg-white">
+          <option value="">Todos</option>
+          <option value="N">Ajuste Normal</option>
+          <option value="T">Ajuste TOP20</option>
+          <option value="I">Inventário Departamental</option>
+        </select>
+      </div>
+      <div>
+        <label class="text-xs font-medium text-slate-500 uppercase">Natureza</label>
+        <select id="f-natureza" class="mt-1 w-full border border-slate-200 rounded-xl px-3 py-2.5 text-sm bg-white">
+          <option value="">Todas</option>
+          <option value="S">Sobra</option>
+          <option value="F">Falta</option>
+        </select>
+      </div>
+      <div>
+        <label class="text-xs font-medium text-slate-500 uppercase">Produto (busca)</label>
+        <input type="text" id="f-produto" placeholder="Nome ou código..." class="mt-1 w-full border border-slate-200 rounded-xl px-3 py-2.5 text-sm" />
+      </div>
+    </div>
+    <div class="p-4 border-t border-slate-200 flex gap-2">
+      <button id="btn-clear" class="flex-1 py-2.5 text-sm font-medium rounded-xl border border-slate-200 text-slate-600 hover:bg-slate-50">Limpar</button>
+      <button id="btn-apply" class="flex-1 py-2.5 text-sm font-semibold rounded-xl bg-brand-600 text-white hover:bg-brand-700">Aplicar</button>
+    </div>
+  </aside>
+
+  <!-- Product Modal -->
+  <div id="modal" class="fixed inset-0 z-50 hidden">
+    <div class="absolute inset-0 bg-black/50" id="modal-overlay"></div>
+    <div class="absolute inset-x-0 bottom-0 sm:inset-0 sm:flex sm:items-center sm:justify-center p-0 sm:p-4">
+      <div class="bg-white rounded-t-2xl sm:rounded-2xl w-full sm:max-w-lg max-h-[85vh] overflow-hidden flex flex-col shadow-2xl">
+        <div class="px-4 py-3 border-b border-slate-100 flex items-center justify-between">
+          <h3 class="font-semibold text-slate-900 text-sm">Detalhe do Produto</h3>
+          <button id="modal-close" class="p-2 rounded-lg hover:bg-slate-100 text-slate-500">
+            <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/></svg>
+          </button>
+        </div>
+        <div id="modal-body" class="flex-1 overflow-y-auto p-4 scrollbar-thin"></div>
+      </div>
+    </div>
+  </div>
+
+  <script src="app.js"></script>
+</body>
+</html>
