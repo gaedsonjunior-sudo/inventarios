@@ -496,7 +496,12 @@
   }
 
   function renderDeptos(agg) {
-    var list = agg.deptos.slice().sort(function (a, b) { return a.total - b.total; });
+    var sort = el('sort-deptos').value;
+    var list = agg.deptos.slice();
+    if (sort === 'total_asc') list.sort(function (a, b) { return a.total - b.total; });
+    else if (sort === 'total_desc') list.sort(function (a, b) { return b.total - a.total; });
+    else list.sort(function (a, b) { return a.depto.localeCompare(b.depto); });
+
     el('rank-deptos').innerHTML = list.map(function (d) {
       return '<tr class="border-t border-slate-50 hover:bg-slate-50 cursor-pointer" data-filter-depto="' + d.depto + '">' +
         '<td class="py-2 pl-1 text-sm font-medium text-slate-800 text-left whitespace-nowrap">' + d.depto + '</td>' +
@@ -517,7 +522,12 @@
   }
 
   function renderRegionais(agg) {
-    var list = agg.regionais.slice().sort(function (a, b) { return a.total - b.total; });
+    var sort = el('sort-regionais').value;
+    var list = agg.regionais.slice();
+    if (sort === 'total_asc') list.sort(function (a, b) { return a.total - b.total; });
+    else if (sort === 'total_desc') list.sort(function (a, b) { return b.total - a.total; });
+    else list.sort(function (a, b) { return a.regional.localeCompare(b.regional); });
+
     el('rank-regionais').innerHTML = list.map(function (r) {
       return '<tr class="border-t border-slate-50 hover:bg-slate-50 cursor-pointer" data-filter-reg="' + r.regional + '">' +
         '<td class="py-2 pl-1 text-sm font-medium text-slate-800 text-left whitespace-nowrap">' + r.regional +
@@ -629,6 +639,8 @@
   el('btn-clear').addEventListener('click', clearFilters);
   el('btn-export').addEventListener('click', exportCSV);
   el('sort-lojas').addEventListener('change', function () { renderLojas(aggregate()); });
+  el('sort-deptos').addEventListener('change', function () { renderDeptos(aggregate()); });
+  el('sort-regionais').addEventListener('change', function () { renderRegionais(aggregate()); });
   el('top-n-faltas').addEventListener('change', function () { renderTopFaltas(aggregate()); });
   el('top-n-sobras').addEventListener('change', function () { renderTopSobras(aggregate()); });
   el('modal-close').addEventListener('click', closeModal);

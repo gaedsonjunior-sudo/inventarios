@@ -127,8 +127,13 @@
       </section>
 
       <section class="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden">
-        <div class="px-3 sm:px-4 py-2 sm:py-3 border-b border-slate-100">
+        <div class="px-3 sm:px-4 py-2 sm:py-3 border-b border-slate-100 flex items-center justify-between gap-2">
           <h2 class="text-sm font-semibold text-slate-800">Departamentos</h2>
+          <select id="sort-deptos" class="text-[11px] border border-slate-200 rounded-lg px-2 py-1 bg-white">
+            <option value="total_asc">Pior total</option>
+            <option value="total_desc">Melhor total</option>
+            <option value="nome">Nome</option>
+          </select>
         </div>
         <div class="px-2 sm:px-3 py-2">
           <div class="overflow-x-auto overflow-y-auto scrollbar-thin" style="max-height: 320px;">
@@ -150,8 +155,13 @@
     </div>
 
     <section class="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden">
-      <div class="px-3 sm:px-4 py-2 sm:py-3 border-b border-slate-100">
+      <div class="px-3 sm:px-4 py-2 sm:py-3 border-b border-slate-100 flex items-center justify-between gap-2">
         <h2 class="text-sm font-semibold text-slate-800">Regionais</h2>
+        <select id="sort-regionais" class="text-[11px] border border-slate-200 rounded-lg px-2 py-1 bg-white">
+          <option value="total_asc">Pior total</option>
+          <option value="total_desc">Melhor total</option>
+          <option value="nome">Nome</option>
+        </select>
       </div>
       <div class="px-2 sm:px-3 py-2 overflow-x-auto">
         <table class="w-full text-left min-w-[380px] sm:min-w-[480px]">
