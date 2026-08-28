@@ -8,7 +8,7 @@
   var evolTipo = 'ALL';
 
   var filters = {
-    regional: '', loja: '', depto: '', mes: '',
+    regional: '', loja: '', depto: [], mes: '',
     dataIni: '', dataFim: '', tipo: '', natureza: '', produto: ''
   };
 
@@ -163,10 +163,32 @@
       options.map(function (o) { return '<option value="' + o + '">' + o + '</option>'; }).join('');
   }
 
+  function fillDeptosCheckboxes(containerId, options) {
+    var container = el(containerId);
+    container.innerHTML = options.map(function (o) {
+      return '<label class="flex items-center gap-2 py-1 cursor-pointer hover:bg-slate-50 px-2 rounded">' +
+        '<input type="checkbox" value="' + o + '" class="depto-checkbox rounded border-slate-300 text-brand-600 focus:ring-brand-500">' +
+        '<span class="text-sm text-slate-700">' + o + '</span>' +
+        '</label>';
+    }).join('');
+
+    // Adicionar botão para selecionar todos
+    var selectAllBtn = document.createElement('button');
+    selectAllBtn.className = 'text-xs text-brand-600 hover:text-brand-700 font-medium mt-2 px-2';
+    selectAllBtn.textContent = 'Selecionar todos';
+    selectAllBtn.onclick = function () {
+      var checkboxes = container.querySelectorAll('.depto-checkbox');
+      var allChecked = Array.from(checkboxes).every(function (cb) { return cb.checked; });
+      checkboxes.forEach(function (cb) { cb.checked = !allChecked; });
+      selectAllBtn.textContent = allChecked ? 'Selecionar todos' : 'Limpar seleção';
+    };
+    container.appendChild(selectAllBtn);
+  }
+
   function initFilters() {
     fillSelect('f-regional', META.regionais || []);
     fillSelect('f-loja', META.lojas || []);
-    fillSelect('f-depto', META.deptos || []);
+    fillDeptosCheckboxes('f-depto-container', META.deptos || []);
     var meses = (META.meses || []).slice().sort(function (a, b) {
       return MES_ORDER.indexOf(a) - MES_ORDER.indexOf(b);
     });
@@ -193,7 +215,11 @@
   function readFiltersFromUI() {
     filters.regional = el('f-regional').value;
     filters.loja = el('f-loja').value;
-    filters.depto = el('f-depto').value;
+    
+    // Ler checkboxes de departamentos
+    var deptoCheckboxes = document.querySelectorAll('.depto-checkbox:checked');
+    filters.depto = Array.from(deptoCheckboxes).map(function (cb) { return cb.value; });
+    
     filters.mes = el('f-mes').value;
     filters.dataIni = el('f-data-ini').value;
     filters.dataFim = el('f-data-fim').value;
@@ -203,8 +229,15 @@
   }
 
   function clearFilters() {
-    Object.keys(filters).forEach(function (k) { filters[k] = ''; });
-    ['f-regional','f-loja','f-depto','f-mes','f-tipo','f-natureza'].forEach(function (id) { el(id).value = ''; });
+    Object.keys(filters).forEach(function (k) { 
+      if (k === 'depto') filters[k] = [];
+      else filters[k] = ''; 
+    });
+    ['f-regional','f-loja','f-mes','f-tipo','f-natureza'].forEach(function (id) { el(id).value = ''; });
+    
+    // Limpar checkboxes de departamento
+    document.querySelectorAll('.depto-checkbox').forEach(function (cb) { cb.checked = false; });
+    
     el('f-data-ini').value = '';
     el('f-data-fim').value = '';
     el('f-produto').value = '';
@@ -217,7 +250,7 @@
     var chips = [];
     if (filters.regional) chips.push(['Regional', filters.regional, 'regional']);
     if (filters.loja) chips.push(['Loja', filters.loja, 'loja']);
-    if (filters.depto) chips.push(['Depto', filters.depto, 'depto']);
+    if (filters.depto.length > 0) chips.push(['Depto', filters.depto.length + ' selecionados', 'depto']);
     if (filters.mes) chips.push(['Mês', filters.mes, 'mes']);
     if (filters.dataIni) chips.push(['De', filters.dataIni, 'dataIni']);
     if (filters.dataFim) chips.push(['Até', filters.dataFim, 'dataFim']);
@@ -240,9 +273,14 @@
     box.querySelectorAll('[data-clear]').forEach(function (btn) {
       btn.addEventListener('click', function () {
         var k = btn.dataset.clear;
-        filters[k] = '';
-        var map = { regional:'f-regional', loja:'f-loja', depto:'f-depto', mes:'f-mes', dataIni:'f-data-ini', dataFim:'f-data-fim', tipo:'f-tipo', natureza:'f-natureza', produto:'f-produto' };
-        if (map[k]) el(map[k]).value = '';
+        if (k === 'depto') {
+          filters.depto = [];
+          document.querySelectorAll('.depto-checkbox').forEach(function (cb) { cb.checked = false; });
+        } else {
+          filters[k] = '';
+          var map = { regional:'f-regional', loja:'f-loja', mes:'f-mes', dataIni:'f-data-ini', dataFim:'f-data-fim', tipo:'f-tipo', natureza:'f-natureza', produto:'f-produto' };
+          if (map[k]) el(map[k]).value = '';
+        }
         applyFilters();
       });
     });
@@ -252,7 +290,7 @@
     filtered = RAW.filter(function (r) {
       if (filters.regional && r.regional !== filters.regional) return false;
       if (filters.loja && r.loja !== filters.loja) return false;
-      if (filters.depto && r.depto !== filters.depto) return false;
+      if (filters.depto.length > 0 && filters.depto.indexOf(r.depto) === -1) return false;
       if (filters.mes && r.mes !== filters.mes) return false;
       if (filters.dataIni && r.data < filters.dataIni) return false;
       if (filters.dataFim && r.data > filters.dataFim) return false;
@@ -468,8 +506,11 @@
 
     el('rank-deptos').querySelectorAll('[data-filter-depto]').forEach(function (row) {
       row.addEventListener('click', function () {
-        filters.depto = row.dataset.filterDepto;
-        el('f-depto').value = filters.depto;
+        filters.depto = [row.dataset.filterDepto];
+        // Marcar apenas o checkbox correspondente
+        document.querySelectorAll('.depto-checkbox').forEach(function (cb) {
+          cb.checked = (cb.value === row.dataset.filterDepto);
+        });
         applyFilters();
       });
     });
