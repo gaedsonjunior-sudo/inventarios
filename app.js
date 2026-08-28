@@ -495,6 +495,44 @@
     });
   }
 
+  function openExpandModal(title, tableHTML) {
+    el('modal-title').textContent = title;
+    el('modal-body').innerHTML = tableHTML;
+    el('modal').classList.remove('hidden');
+  }
+
+  function renderFullLojasTable(list) {
+    return '<div class="overflow-x-auto"><table class="w-full text-left">' +
+      '<thead><tr class="text-[10px] text-slate-400 uppercase border-b border-slate-200">' +
+      '<th class="pb-2 font-medium pl-1 text-left">Loja</th>' +
+      '<th class="pb-2 font-medium text-center">Normal</th>' +
+      '<th class="pb-2 font-medium text-center">TOP20</th>' +
+      '<th class="pb-2 font-medium text-center">Inv.</th>' +
+      '<th class="pb-2 font-medium text-center pr-1">Total</th></tr></thead>' +
+      '<tbody>' + list.map(function (l) {
+        return '<tr class="border-b border-slate-50 hover:bg-slate-50 cursor-pointer" data-filter-loja="' + l.loja + '">' +
+          '<td class="py-2 pl-1 text-sm font-medium text-slate-800 text-left whitespace-nowrap">' + l.loja + '</td>' +
+          cellMoney(l.N) + cellMoney(l.T) + cellMoney(l.I) +
+          '<td class="py-2 pr-1 text-center text-xs font-bold tabular-nums whitespace-nowrap ' + moneyClass(l.total) + '">' + fmtMoneyCompact(l.total) + '</td></tr>';
+      }).join('') + '</tbody></table></div>';
+  }
+
+  function renderFullDeptosTable(list) {
+    return '<div class="overflow-x-auto"><table class="w-full text-left">' +
+      '<thead><tr class="text-[10px] text-slate-400 uppercase border-b border-slate-200">' +
+      '<th class="pb-2 font-medium pl-1 text-left">Depto</th>' +
+      '<th class="pb-2 font-medium text-center">Normal</th>' +
+      '<th class="pb-2 font-medium text-center">TOP20</th>' +
+      '<th class="pb-2 font-medium text-center">Inv.</th>' +
+      '<th class="pb-2 font-medium text-center pr-1">Total</th></tr></thead>' +
+      '<tbody>' + list.map(function (d) {
+        return '<tr class="border-b border-slate-50 hover:bg-slate-50 cursor-pointer" data-filter-depto="' + d.depto + '">' +
+          '<td class="py-2 pl-1 text-sm font-medium text-slate-800 text-left whitespace-nowrap">' + d.depto + '</td>' +
+          cellMoney(d.N) + cellMoney(d.T) + cellMoney(d.I) +
+          '<td class="py-2 pr-1 text-center text-xs font-bold tabular-nums whitespace-nowrap ' + moneyClass(d.total) + '">' + fmtMoneyCompact(d.total) + '</td></tr>';
+      }).join('') + '</tbody></table></div>';
+  }
+
   function renderDeptos(agg) {
     var sort = el('sort-deptos').value;
     var list = agg.deptos.slice();
@@ -645,6 +683,49 @@
   el('top-n-sobras').addEventListener('change', function () { renderTopSobras(aggregate()); });
   el('modal-close').addEventListener('click', closeModal);
   el('modal-overlay').addEventListener('click', closeModal);
+
+  // Botões expandir
+  el('btn-expand-lojas').addEventListener('click', function () {
+    var agg = aggregate();
+    var sort = el('sort-lojas').value;
+    var list = agg.lojas.slice();
+    if (sort === 'total_asc') list.sort(function (a, b) { return a.total - b.total; });
+    else if (sort === 'total_desc') list.sort(function (a, b) { return b.total - a.total; });
+    else list.sort(function (a, b) { return a.loja.localeCompare(b.loja); });
+    openExpandModal('Todas as Lojas', renderFullLojasTable(list));
+    
+    // Adicionar listeners para as linhas no modal
+    el('modal-body').querySelectorAll('[data-filter-loja]').forEach(function (row) {
+      row.addEventListener('click', function () {
+        filters.loja = row.dataset.filterLoja;
+        el('f-loja').value = filters.loja;
+        closeModal();
+        applyFilters();
+      });
+    });
+  });
+
+  el('btn-expand-deptos').addEventListener('click', function () {
+    var agg = aggregate();
+    var sort = el('sort-deptos').value;
+    var list = agg.deptos.slice();
+    if (sort === 'total_asc') list.sort(function (a, b) { return a.total - b.total; });
+    else if (sort === 'total_desc') list.sort(function (a, b) { return b.total - a.total; });
+    else list.sort(function (a, b) { return a.depto.localeCompare(b.depto); });
+    openExpandModal('Todos os Departamentos', renderFullDeptosTable(list));
+    
+    // Adicionar listeners para as linhas no modal
+    el('modal-body').querySelectorAll('[data-filter-depto]').forEach(function (row) {
+      row.addEventListener('click', function () {
+        filters.depto = [row.dataset.filterDepto];
+        document.querySelectorAll('.depto-checkbox').forEach(function (cb) {
+          cb.checked = (cb.value === row.dataset.filterDepto);
+        });
+        closeModal();
+        applyFilters();
+      });
+    });
+  });
 
   document.querySelectorAll('.evol-btn').forEach(function (btn) {
     btn.addEventListener('click', function () {

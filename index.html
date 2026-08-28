@@ -102,11 +102,14 @@
       <section class="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden">
         <div class="px-3 sm:px-4 py-2 sm:py-3 border-b border-slate-100 flex items-center justify-between gap-2">
           <h2 class="text-sm font-semibold text-slate-800">Lojas</h2>
-          <select id="sort-lojas" class="text-[11px] border border-slate-200 rounded-lg px-2 py-1 bg-white">
-            <option value="total_asc">Pior total</option>
-            <option value="total_desc">Melhor total</option>
-            <option value="nome">Nome</option>
-          </select>
+          <div class="flex items-center gap-2">
+            <select id="sort-lojas" class="text-[11px] border border-slate-200 rounded-lg px-2 py-1 bg-white">
+              <option value="total_asc">Pior total</option>
+              <option value="total_desc">Melhor total</option>
+              <option value="nome">Nome</option>
+            </select>
+            <button id="btn-expand-lojas" class="text-[11px] text-brand-600 hover:text-brand-700 font-medium">Ver tudo</button>
+          </div>
         </div>
         <div class="px-2 sm:px-3 py-2">
           <div class="overflow-x-auto overflow-y-auto scrollbar-thin" style="max-height: 320px;">
@@ -129,11 +132,14 @@
       <section class="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden">
         <div class="px-3 sm:px-4 py-2 sm:py-3 border-b border-slate-100 flex items-center justify-between gap-2">
           <h2 class="text-sm font-semibold text-slate-800">Departamentos</h2>
-          <select id="sort-deptos" class="text-[11px] border border-slate-200 rounded-lg px-2 py-1 bg-white">
-            <option value="total_asc">Pior total</option>
-            <option value="total_desc">Melhor total</option>
-            <option value="nome">Nome</option>
-          </select>
+          <div class="flex items-center gap-2">
+            <select id="sort-deptos" class="text-[11px] border border-slate-200 rounded-lg px-2 py-1 bg-white">
+              <option value="total_asc">Pior total</option>
+              <option value="total_desc">Melhor total</option>
+              <option value="nome">Nome</option>
+            </select>
+            <button id="btn-expand-deptos" class="text-[11px] text-brand-600 hover:text-brand-700 font-medium">Ver tudo</button>
+          </div>
         </div>
         <div class="px-2 sm:px-3 py-2">
           <div class="overflow-x-auto overflow-y-auto scrollbar-thin" style="max-height: 320px;">
@@ -276,7 +282,7 @@
     <div class="absolute inset-x-0 bottom-0 sm:inset-0 sm:flex sm:items-center sm:justify-center p-0 sm:p-4">
       <div class="bg-white rounded-t-2xl sm:rounded-2xl w-full sm:max-w-lg max-h-[85vh] overflow-hidden flex flex-col shadow-2xl">
         <div class="px-3 sm:px-4 py-2 sm:py-3 border-b border-slate-100 flex items-center justify-between">
-          <h3 class="font-semibold text-slate-900 text-sm">Detalhe do Produto</h3>
+          <h3 class="font-semibold text-slate-900 text-sm" id="modal-title">Detalhe do Produto</h3>
           <button id="modal-close" class="p-2 rounded-lg hover:bg-slate-100 text-slate-500">
             <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/></svg>
           </button>
