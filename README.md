@@ -1,51 +1,38 @@
 # Painel de Inventários e Ajustes de Estoque
 
-## Publicar no GitHub Pages
-
-### 1. Estrutura do repositório
-
-Coloque **na raiz** do repositório (ou na pasta `/docs` se usar essa opção):
+## Arquivos para o GitHub Pages (raiz do repositório)
 
 ```
-index.html
-app.js
-data.js
+index.html    → Painel principal
+app.js        → Lógica
+data.js       → Base de dados
+admin.html    → Atualização da base (protegido por senha)
 ```
 
-Não use subpastas para esses três arquivos.
+## GitHub Pages
 
-### 2. Configurar o Pages
+1. Settings → Pages
+2. Branch: main · Folder: / (root)
+3. URL: `https://SEU-USUARIO.github.io/NOME-DO-REPO/`
 
-1. No GitHub: **Settings → Pages**
-2. **Source:** Deploy from a branch
-3. **Branch:** `main` (ou `master`)
-4. **Folder:** `/ (root)`  
-   *(ou `/docs` se você colocou os arquivos dentro de `docs/`)*
-5. Salve e aguarde 1–2 minutos
+## Atualizar a base
 
-### 3. Acessar
+Acesse: `https://SEU-USUARIO.github.io/NOME-DO-REPO/admin.html`
 
-A URL será:
+- Senha padrão: `admin2026` (altere em `admin.html`, variável `ADMIN_PASSWORD`)
+- Envie o Excel → processa no navegador → salva no IndexedDB
+- O painel usa a base atualizada **neste navegador**
+- Para publicar para todos: clique em **Baixar data.js** e substitua no repositório GitHub
 
-```
-https://SEU-USUARIO.github.io/NOME-DO-REPO/
-```
+## Regras de negócio
 
-Exemplo: `https://joao.github.io/painel-estoque/`
+| Cod Dcto | Tipo | Natureza | Sinal na tela |
+|----------|------|----------|---------------|
+| 6416 | Ajuste Normal | Sobra | + |
+| 6417 | Ajuste Normal | Falta | − |
+| 5200 | Ajuste TOP20 | Sobra | + |
+| 5600 | Ajuste TOP20 | Falta | − |
+| 5201 | Inventário Departamental | Sobra | + |
+| 5601 | Inventário Departamental | Falta | − |
 
-### Problemas comuns
-
-| Problema | Solução |
-|----------|---------|
-| Página em branco | Abra o Console do navegador (F12). Veja se há erro 404 em `data.js` ou `app.js` |
-| 404 nos arquivos | Confirme que os 3 arquivos estão na **raiz** do branch publicado |
-| Demora para carregar | `data.js` tem ~7,5 MB — na primeira vez pode levar alguns segundos |
-| Cache antigo | Ctrl+F5 ou aba anônima |
-
-### Arquivos
-
-| Arquivo | Função |
-|---------|--------|
-| `index.html` | Interface |
-| `app.js` | Lógica do painel |
-| `data.js` | Base de dados (41.139 lançamentos) |
+Resultado = soma dos valores com sinal (sobras positivas + faltas negativas).

@@ -1,74 +1,105 @@
-/* Painel de Inventários e Ajustes de Estoque */
 (function () {
   'use strict';
 
-  let RAW = [];
-  let META = {};
-  let filtered = [];
-  let chart = null;
-  let metric = 'v';
+  var RAW = [];
+  var META = {};
+  var filtered = [];
+  var chart = null;
+  var evolTipo = 'ALL';
 
-  const filters = {
+  var filters = {
     regional: '', loja: '', depto: '', mes: '',
-    dataIni: '', dataFim: '', tipo: '', natureza: '', produto: '',
+    dataIni: '', dataFim: '', tipo: '', natureza: '', produto: ''
   };
 
-  const TIPO_LABEL = { N: 'Ajuste Normal', T: 'Ajuste TOP20', I: 'Inventário Departamental' };
-  const MES_ORDER = ['jan','fev','mar','abr','mai','jun','jul','ago','set','out','nov','dez'];
+  var TIPO_LABEL = { N: 'Ajuste Normal', T: 'Ajuste TOP20', I: 'Inventário Departamental' };
+  var MES_ORDER = ['jan','fev','mar','abr','mai','jun','jul','ago','set','out','nov','dez'];
 
-  const fmt = (n, dec = 2) => {
+  function fmt(n, dec) {
+    if (dec === undefined) dec = 2;
     if (n == null || isNaN(n)) return '—';
     return n.toLocaleString('pt-BR', { minimumFractionDigits: dec, maximumFractionDigits: dec });
-  };
-  const fmtMoney = (n) => {
+  }
+  function fmtMoney(n) {
     if (n == null || isNaN(n)) return '—';
-    const abs = Math.abs(n);
-    const s = abs.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+    var abs = Math.abs(n);
+    var s = abs.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
     return n < 0 ? '-R$ ' + s : 'R$ ' + s;
-  };
-  const fmtMoneyAbs = (n) => {
-    const abs = Math.abs(n || 0);
-    return 'R$ ' + abs.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
-  };
-  const el = (id) => document.getElementById(id);
+  }
+  function moneyClass(n) {
+    if (n < 0) return 'text-falta';
+    if (n > 0) return 'text-sobra';
+    return 'text-slate-700';
+  }
+  function el(id) { return document.getElementById(id); }
+
+  // ── Load (IndexedDB override or data.js) ──
+  function loadFromIDB() {
+    return new Promise(function (resolve) {
+      try {
+        var req = indexedDB.open('painel_estoque', 1);
+        req.onupgradeneeded = function (e) {
+          var db = e.target.result;
+          if (!db.objectStoreNames.contains('base')) db.createObjectStore('base');
+        };
+        req.onsuccess = function (e) {
+          var db = e.target.result;
+          try {
+            var tx = db.transaction('base', 'readonly');
+            var store = tx.objectStore('base');
+            var g = store.get('data');
+            g.onsuccess = function () { resolve(g.result || null); };
+            g.onerror = function () { resolve(null); };
+          } catch (err) { resolve(null); }
+        };
+        req.onerror = function () { resolve(null); };
+      } catch (err) { resolve(null); }
+    });
+  }
 
   function loadData() {
-    const pct = el('load-pct');
-    try {
-      pct.textContent = 'Processando base...';
-      if (!window.APP_DATA) {
-        throw new Error('APP_DATA não encontrado. Verifique se data.js foi carregado.');
+    var pct = el('load-pct');
+    pct.textContent = 'Verificando base atualizada...';
+    loadFromIDB().then(function (idbData) {
+      try {
+        var parsed = idbData || window.APP_DATA;
+        if (!parsed) throw new Error('Nenhuma base encontrada (data.js ou IndexedDB).');
+        pct.textContent = 'Processando...';
+        META = parsed.meta;
+        RAW = parsed.data.map(function (r) {
+          return {
+            regional: r.r, loja: r.l, mes: r.m, data: r.d,
+            cod_depto: r.cd, depto: r.dp, cod_produto: r.cp, produto: r.p,
+            cod_dcto: r.dc, tipo: r.t, natureza: r.n, valor: r.v, qtde: r.q
+          };
+        });
+        el('loading').style.display = 'none';
+        if (idbData) {
+          el('header-sub').textContent = (META.regionais && META.regionais[0] || '') + ' · base atualizada localmente';
+        }
+        initFilters();
+        applyFilters();
+      } catch (err) {
+        console.error(err);
+        pct.textContent = 'Erro: ' + err.message;
       }
-      var parsed = window.APP_DATA;
-      META = parsed.meta;
-      RAW = parsed.data.map(function (r) {
-        return {
-          regional: r.r, loja: r.l, mes: r.m, data: r.d,
-          cod_depto: r.cd, depto: r.dp, cod_produto: r.cp, produto: r.p,
-          cod_dcto: r.dc, tipo: r.t, natureza: r.n, valor: r.v, qtde: r.q,
-        };
-      });
-      el('loading').style.display = 'none';
-      initFilters();
-      applyFilters();
-    } catch (err) {
-      console.error(err);
-      pct.textContent = 'Erro ao carregar: ' + err.message;
-    }
+    });
   }
 
   function fillSelect(id, options, allLabel) {
     allLabel = allLabel || 'Todos';
-    const s = el(id);
+    var s = el(id);
     s.innerHTML = '<option value="">' + allLabel + '</option>' +
-      options.map((o) => '<option value="' + o + '">' + o + '</option>').join('');
+      options.map(function (o) { return '<option value="' + o + '">' + o + '</option>'; }).join('');
   }
 
   function initFilters() {
     fillSelect('f-regional', META.regionais || []);
     fillSelect('f-loja', META.lojas || []);
     fillSelect('f-depto', META.deptos || []);
-    const meses = (META.meses || []).slice().sort((a, b) => MES_ORDER.indexOf(a) - MES_ORDER.indexOf(b));
+    var meses = (META.meses || []).slice().sort(function (a, b) {
+      return MES_ORDER.indexOf(a) - MES_ORDER.indexOf(b);
+    });
     fillSelect('f-mes', meses);
     if (META.data_min) el('f-data-ini').min = META.data_min;
     if (META.data_max) {
@@ -76,7 +107,9 @@
       el('f-data-ini').max = META.data_max;
       el('f-data-fim').min = META.data_min;
     }
-    el('header-sub').textContent = (META.regionais && META.regionais[0] || '') + ' · ' + (META.total || 0).toLocaleString('pt-BR') + ' lançamentos';
+    if (!el('header-sub').textContent || el('header-sub').textContent === '—') {
+      el('header-sub').textContent = (META.regionais && META.regionais[0] || '') + ' · ' + (META.total || 0).toLocaleString('pt-BR') + ' lançamentos';
+    }
   }
 
   function openDrawer() {
@@ -113,8 +146,8 @@
   }
 
   function renderActiveChips() {
-    const box = el('active-filters');
-    const chips = [];
+    var box = el('active-filters');
+    var chips = [];
     if (filters.regional) chips.push(['Regional', filters.regional, 'regional']);
     if (filters.loja) chips.push(['Loja', filters.loja, 'loja']);
     if (filters.depto) chips.push(['Depto', filters.depto, 'depto']);
@@ -131,7 +164,7 @@
         '<button data-clear="' + c[2] + '" class="ml-0.5 hover:text-brand-900">×</button></span>';
     }).join('');
 
-    const badge = el('filter-badge');
+    var badge = el('filter-badge');
     if (chips.length) {
       badge.textContent = chips.length;
       badge.classList.remove('hidden');
@@ -139,9 +172,9 @@
 
     box.querySelectorAll('[data-clear]').forEach(function (btn) {
       btn.addEventListener('click', function () {
-        const k = btn.dataset.clear;
+        var k = btn.dataset.clear;
         filters[k] = '';
-        const map = { regional:'f-regional', loja:'f-loja', depto:'f-depto', mes:'f-mes', dataIni:'f-data-ini', dataFim:'f-data-fim', tipo:'f-tipo', natureza:'f-natureza', produto:'f-produto' };
+        var map = { regional:'f-regional', loja:'f-loja', depto:'f-depto', mes:'f-mes', dataIni:'f-data-ini', dataFim:'f-data-fim', tipo:'f-tipo', natureza:'f-natureza', produto:'f-produto' };
         if (map[k]) el(map[k]).value = '';
         applyFilters();
       });
@@ -168,75 +201,82 @@
     renderAll();
   }
 
+  // ── Aggregate ──
+  function emptyTipo() { return { N: 0, T: 0, I: 0, total: 0 }; }
+
   function aggregate() {
-    var sobras = 0, faltas = 0;
-    var lojas = new Map(), deptos = new Map(), regionais = new Map();
-    var meses = new Map(), tipos = new Map();
-    var produtosFalta = new Map(), produtosSobra = new Map();
-    var lojasSet = new Set(), prodSet = new Set();
+    var byTipo = emptyTipo();
+    var lojas = new Map();
+    var deptos = new Map();
+    var regionais = new Map();
+    var meses = new Map();
+    var prodFalta = new Map();
+    var prodSobra = new Map();
 
     for (var i = 0; i < filtered.length; i++) {
       var r = filtered[i];
-      var v = r.valor, q = r.qtde;
-      if (r.natureza === 'S') sobras += v; else faltas += v;
-      lojasSet.add(r.loja);
-      prodSet.add(r.cod_produto);
+      var v = r.valor;
+      var t = r.tipo;
 
-      if (!lojas.has(r.loja)) lojas.set(r.loja, { loja: r.loja, regional: r.regional, sobras: 0, faltas: 0, resultado: 0, qtd: 0 });
+      byTipo[t] = (byTipo[t] || 0) + v;
+      byTipo.total += v;
+
+      // Loja
+      if (!lojas.has(r.loja)) lojas.set(r.loja, { loja: r.loja, regional: r.regional, N: 0, T: 0, I: 0, total: 0 });
       var lj = lojas.get(r.loja);
-      if (r.natureza === 'S') lj.sobras += v; else lj.faltas += v;
-      lj.resultado += v; lj.qtd++;
+      lj[t] += v; lj.total += v;
 
-      if (!deptos.has(r.depto)) deptos.set(r.depto, { depto: r.depto, sobras: 0, faltas: 0, resultado: 0, qtd: 0 });
+      // Depto
+      if (!deptos.has(r.depto)) deptos.set(r.depto, { depto: r.depto, N: 0, T: 0, I: 0, total: 0 });
       var dp = deptos.get(r.depto);
-      if (r.natureza === 'S') dp.sobras += v; else dp.faltas += v;
-      dp.resultado += v; dp.qtd++;
+      dp[t] += v; dp.total += v;
 
-      if (!regionais.has(r.regional)) regionais.set(r.regional, { regional: r.regional, sobras: 0, faltas: 0, resultado: 0, qtd: 0, lojas: new Set() });
+      // Regional
+      if (!regionais.has(r.regional)) regionais.set(r.regional, { regional: r.regional, N: 0, T: 0, I: 0, total: 0, nLojas: new Set() });
       var rg = regionais.get(r.regional);
-      if (r.natureza === 'S') rg.sobras += v; else rg.faltas += v;
-      rg.resultado += v; rg.qtd++; rg.lojas.add(r.loja);
+      rg[t] += v; rg.total += v; rg.nLojas.add(r.loja);
 
-      if (!meses.has(r.mes)) meses.set(r.mes, { mes: r.mes, sobras: 0, faltas: 0, resultado: 0, qtdeS: 0, qtdeF: 0 });
+      // Mês (por tipo + total)
+      if (!meses.has(r.mes)) meses.set(r.mes, { mes: r.mes, N: 0, T: 0, I: 0, total: 0 });
       var ms = meses.get(r.mes);
-      if (r.natureza === 'S') { ms.sobras += v; ms.qtdeS += q; }
-      else { ms.faltas += v; ms.qtdeF += q; }
-      ms.resultado += v;
+      ms[t] += v; ms.total += v;
 
-      if (!tipos.has(r.tipo)) tipos.set(r.tipo, { tipo: r.tipo, sobras: 0, faltas: 0, resultado: 0, qtd: 0 });
-      var tp = tipos.get(r.tipo);
-      if (r.natureza === 'S') tp.sobras += v; else tp.faltas += v;
-      tp.resultado += v; tp.qtd++;
-
-      var pkey = r.cod_produto + '|' + r.loja;
+      // Produtos agregados (sem loja)
       if (r.natureza === 'F') {
-        if (!produtosFalta.has(pkey)) produtosFalta.set(pkey, { produto: r.produto, cod: r.cod_produto, loja: r.loja, depto: r.depto, valor: 0, qtde: 0 });
-        var pf = produtosFalta.get(pkey);
-        pf.valor += v; pf.qtde += q;
+        if (!prodFalta.has(r.cod_produto)) {
+          prodFalta.set(r.cod_produto, { produto: r.produto, cod: r.cod_produto, depto: r.depto, valor: 0, qtde: 0 });
+        }
+        var pf = prodFalta.get(r.cod_produto);
+        pf.valor += v; pf.qtde += r.qtde;
+        if (!pf.depto) pf.depto = r.depto;
       } else {
-        if (!produtosSobra.has(pkey)) produtosSobra.set(pkey, { produto: r.produto, cod: r.cod_produto, loja: r.loja, depto: r.depto, valor: 0, qtde: 0 });
-        var ps = produtosSobra.get(pkey);
-        ps.valor += v; ps.qtde += q;
+        if (!prodSobra.has(r.cod_produto)) {
+          prodSobra.set(r.cod_produto, { produto: r.produto, cod: r.cod_produto, depto: r.depto, valor: 0, qtde: 0 });
+        }
+        var ps = prodSobra.get(r.cod_produto);
+        ps.valor += v; ps.qtde += r.qtde;
+        if (!ps.depto) ps.depto = r.depto;
       }
     }
 
     return {
-      sobras: sobras, faltas: faltas, resultado: sobras + faltas,
-      lancamentos: filtered.length, nLojas: lojasSet.size, nProdutos: prodSet.size,
+      byTipo: byTipo,
       lojas: Array.from(lojas.values()),
       deptos: Array.from(deptos.values()),
-      regionais: Array.from(regionais.values()).map(function (r) { return Object.assign({}, r, { nLojas: r.lojas.size }); }),
-      meses: Array.from(meses.values()).sort(function (a, b) { return MES_ORDER.indexOf(a.mes) - MES_ORDER.indexOf(b.mes); }),
-      tipos: Array.from(tipos.values()),
-      topFaltas: Array.from(produtosFalta.values()).sort(function (a, b) { return a.valor - b.valor; }),
-      topSobras: Array.from(produtosSobra.values()).sort(function (a, b) { return b.valor - a.valor; }),
+      regionais: Array.from(regionais.values()).map(function (r) {
+        return { regional: r.regional, N: r.N, T: r.T, I: r.I, total: r.total, nLojas: r.nLojas.size };
+      }),
+      meses: Array.from(meses.values()).sort(function (a, b) {
+        return MES_ORDER.indexOf(a.mes) - MES_ORDER.indexOf(b.mes);
+      }),
+      topFaltas: Array.from(prodFalta.values()).sort(function (a, b) { return a.valor - b.valor; }),
+      topSobras: Array.from(prodSobra.values()).sort(function (a, b) { return b.valor - a.valor; })
     };
   }
 
   function renderAll() {
     var agg = aggregate();
     renderKPIs(agg);
-    renderTipos(agg);
     renderChart(agg);
     renderLojas(agg);
     renderDeptos(agg);
@@ -246,72 +286,48 @@
   }
 
   function renderKPIs(agg) {
-    el('kpi-sobras').textContent = fmtMoney(agg.sobras);
-    el('kpi-faltas').textContent = fmtMoney(agg.faltas);
-    var res = el('kpi-resultado');
-    res.textContent = fmtMoney(agg.resultado);
-    res.className = 'mt-1 text-lg sm:text-xl font-bold tabular-nums ' + (agg.resultado < 0 ? 'text-falta' : agg.resultado > 0 ? 'text-sobra' : 'text-slate-800');
-    el('kpi-lanc').textContent = agg.lancamentos.toLocaleString('pt-BR');
-    el('kpi-lojas').textContent = agg.nLojas.toLocaleString('pt-BR');
-    el('kpi-produtos').textContent = agg.nProdutos.toLocaleString('pt-BR');
-  }
-
-  function renderTipos(agg) {
-    var order = ['N', 'T', 'I'];
-    var map = {};
-    agg.tipos.forEach(function (t) { map[t.tipo] = t; });
-    el('tipos-grid').innerHTML = order.map(function (k) {
-      var t = map[k] || { sobras: 0, faltas: 0, resultado: 0, qtd: 0 };
-      var label = TIPO_LABEL[k];
-      return '<div class="rounded-xl border border-slate-100 bg-slate-50/50 p-3">' +
-        '<p class="text-xs font-semibold text-slate-700 mb-2">' + label + '</p>' +
-        '<div class="grid grid-cols-2 gap-2 text-xs">' +
-        '<div><span class="text-slate-400">Sobras</span><br><span class="font-semibold text-sobra">' + fmtMoney(t.sobras) + '</span></div>' +
-        '<div><span class="text-slate-400">Faltas</span><br><span class="font-semibold text-falta">' + fmtMoney(t.faltas) + '</span></div>' +
-        '<div><span class="text-slate-400">Resultado</span><br><span class="font-semibold ' + (t.resultado < 0 ? 'text-falta' : 'text-sobra') + '">' + fmtMoney(t.resultado) + '</span></div>' +
-        '<div><span class="text-slate-400">Lanç.</span><br><span class="font-semibold text-slate-700">' + t.qtd.toLocaleString('pt-BR') + '</span></div>' +
-        '</div></div>';
-    }).join('');
+    var t = agg.byTipo;
+    el('kpi-total').textContent = fmtMoney(t.total);
+    el('kpi-total').className = 'mt-1 text-xl font-bold tabular-nums ' + moneyClass(t.total);
+    el('kpi-normal').textContent = fmtMoney(t.N);
+    el('kpi-normal').className = 'mt-1 text-xl font-bold tabular-nums ' + moneyClass(t.N);
+    el('kpi-top20').textContent = fmtMoney(t.T);
+    el('kpi-top20').className = 'mt-1 text-xl font-bold tabular-nums ' + moneyClass(t.T);
+    el('kpi-inv').textContent = fmtMoney(t.I);
+    el('kpi-inv').className = 'mt-1 text-xl font-bold tabular-nums ' + moneyClass(t.I);
   }
 
   function renderChart(agg) {
     var labels = agg.meses.map(function (m) { return m.mes; });
-    var dsSobra, dsFalta, dsRes;
-    if (metric === 'v') {
-      dsSobra = agg.meses.map(function (m) { return m.sobras; });
-      dsFalta = agg.meses.map(function (m) { return m.faltas; });
-      dsRes = agg.meses.map(function (m) { return m.resultado; });
-    } else {
-      dsSobra = agg.meses.map(function (m) { return m.qtdeS; });
-      dsFalta = agg.meses.map(function (m) { return m.qtdeF; });
-      dsRes = agg.meses.map(function (m) { return m.qtdeS + m.qtdeF; });
-    }
+    var key = evolTipo === 'ALL' ? 'total' : evolTipo;
+    var data = agg.meses.map(function (m) { return m[key] || 0; });
+    var label = evolTipo === 'ALL' ? 'Resultado Total' : (TIPO_LABEL[evolTipo] || evolTipo);
+
     var ctx = el('chart-evolucao').getContext('2d');
     if (chart) chart.destroy();
     chart = new Chart(ctx, {
       type: 'bar',
       data: {
         labels: labels,
-        datasets: [
-          { label: 'Sobras', data: dsSobra, backgroundColor: 'rgba(16,185,129,0.7)', borderRadius: 4, order: 2 },
-          { label: 'Faltas', data: dsFalta, backgroundColor: 'rgba(239,68,68,0.7)', borderRadius: 4, order: 2 },
-          { label: 'Resultado', data: dsRes, type: 'line', borderColor: '#0369a1', backgroundColor: 'rgba(3,105,161,0.1)', tension: 0.3, borderWidth: 2, pointRadius: 3, order: 1 },
-        ],
+        datasets: [{
+          label: label,
+          data: data,
+          backgroundColor: data.map(function (v) {
+            return v < 0 ? 'rgba(239,68,68,0.75)' : 'rgba(16,185,129,0.75)';
+          }),
+          borderRadius: 4
+        }]
       },
       options: {
-        responsive: true, maintainAspectRatio: false,
-        interaction: { mode: 'index', intersect: false },
+        responsive: true,
+        maintainAspectRatio: false,
         plugins: {
-          legend: { position: 'bottom', labels: { boxWidth: 12, font: { size: 11 } } },
+          legend: { display: false },
           tooltip: {
             callbacks: {
-              label: function (ctx) {
-                var v = ctx.parsed.y;
-                if (metric === 'v') return ctx.dataset.label + ': ' + fmtMoney(v);
-                return ctx.dataset.label + ': ' + fmt(v, 2);
-              },
-            },
-          },
+              label: function (ctx) { return label + ': ' + fmtMoney(ctx.parsed.y); }
+            }
+          }
         },
         scales: {
           x: { grid: { display: false }, ticks: { font: { size: 11 } } },
@@ -319,36 +335,36 @@
             ticks: {
               font: { size: 10 },
               callback: function (v) {
-                if (metric === 'v') return (v >= 0 ? 'R$ ' : '-R$ ') + Math.abs(v / 1000).toFixed(0) + 'k';
-                return fmt(v, 0);
-              },
-            },
-          },
-        },
-      },
+                return (v >= 0 ? 'R$ ' : '-R$ ') + Math.abs(v / 1000).toFixed(0) + 'k';
+              }
+            }
+          }
+        }
+      }
     });
+  }
+
+  function cellMoney(v) {
+    return '<td class="py-2 text-right text-xs font-semibold tabular-nums ' + moneyClass(v) + '">' + fmtMoney(v) + '</td>';
   }
 
   function renderLojas(agg) {
     var sort = el('sort-lojas').value;
     var list = agg.lojas.slice();
-    if (sort === 'resultado_asc') list.sort(function (a, b) { return a.resultado - b.resultado; });
-    else if (sort === 'resultado_desc') list.sort(function (a, b) { return b.resultado - a.resultado; });
-    else if (sort === 'faltas_asc') list.sort(function (a, b) { return a.faltas - b.faltas; });
-    else if (sort === 'sobras_desc') list.sort(function (a, b) { return b.sobras - a.sobras; });
+    if (sort === 'total_asc') list.sort(function (a, b) { return a.total - b.total; });
+    else if (sort === 'total_desc') list.sort(function (a, b) { return b.total - a.total; });
+    else list.sort(function (a, b) { return a.loja.localeCompare(b.loja); });
 
-    el('rank-lojas').innerHTML = list.map(function (l, i) {
-      return '<button class="w-full text-left px-4 py-3 hover:bg-slate-50 transition flex items-start gap-3 card-hover" data-filter-loja="' + l.loja + '">' +
-        '<span class="text-xs font-bold text-slate-300 w-5 shrink-0 mt-0.5">' + (i + 1) + '</span>' +
-        '<div class="flex-1 min-w-0"><p class="text-sm font-semibold text-slate-800 truncate">' + l.loja + '</p>' +
-        '<p class="text-[11px] text-slate-400">' + l.qtd + ' lanç. · ' + l.regional + '</p></div>' +
-        '<div class="text-right shrink-0"><p class="text-sm font-bold tabular-nums ' + (l.resultado < 0 ? 'text-falta' : 'text-sobra') + '">' + fmtMoney(l.resultado) + '</p>' +
-        '<p class="text-[10px] text-slate-400">S ' + fmtMoneyAbs(l.sobras) + ' · F ' + fmtMoneyAbs(l.faltas) + '</p></div></button>';
-    }).join('') || '<p class="p-4 text-sm text-slate-400">Nenhum dado</p>';
+    el('rank-lojas').innerHTML = list.map(function (l) {
+      return '<tr class="border-t border-slate-50 hover:bg-slate-50 cursor-pointer" data-filter-loja="' + l.loja + '">' +
+        '<td class="py-2 pl-1 text-sm font-medium text-slate-800">' + l.loja + '</td>' +
+        cellMoney(l.N) + cellMoney(l.T) + cellMoney(l.I) +
+        '<td class="py-2 pr-1 text-right text-xs font-bold tabular-nums ' + moneyClass(l.total) + '">' + fmtMoney(l.total) + '</td></tr>';
+    }).join('') || '<tr><td colspan="5" class="py-4 text-sm text-slate-400 text-center">Nenhum dado</td></tr>';
 
-    el('rank-lojas').querySelectorAll('[data-filter-loja]').forEach(function (btn) {
-      btn.addEventListener('click', function () {
-        filters.loja = btn.dataset.filterLoja;
+    el('rank-lojas').querySelectorAll('[data-filter-loja]').forEach(function (row) {
+      row.addEventListener('click', function () {
+        filters.loja = row.dataset.filterLoja;
         el('f-loja').value = filters.loja;
         applyFilters();
       });
@@ -356,19 +372,17 @@
   }
 
   function renderDeptos(agg) {
-    var list = agg.deptos.slice().sort(function (a, b) { return a.resultado - b.resultado; });
-    el('rank-deptos').innerHTML = list.map(function (d, i) {
-      return '<button class="w-full text-left px-4 py-3 hover:bg-slate-50 transition flex items-start gap-3" data-filter-depto="' + d.depto + '">' +
-        '<span class="text-xs font-bold text-slate-300 w-5 shrink-0 mt-0.5">' + (i + 1) + '</span>' +
-        '<div class="flex-1 min-w-0"><p class="text-sm font-semibold text-slate-800">' + d.depto + '</p>' +
-        '<p class="text-[11px] text-slate-400">' + d.qtd.toLocaleString('pt-BR') + ' lançamentos</p></div>' +
-        '<div class="text-right shrink-0"><p class="text-sm font-bold tabular-nums ' + (d.resultado < 0 ? 'text-falta' : 'text-sobra') + '">' + fmtMoney(d.resultado) + '</p>' +
-        '<p class="text-[10px] text-slate-400">S ' + fmtMoneyAbs(d.sobras) + ' · F ' + fmtMoneyAbs(d.faltas) + '</p></div></button>';
-    }).join('') || '<p class="p-4 text-sm text-slate-400">Nenhum dado</p>';
+    var list = agg.deptos.slice().sort(function (a, b) { return a.total - b.total; });
+    el('rank-deptos').innerHTML = list.map(function (d) {
+      return '<tr class="border-t border-slate-50 hover:bg-slate-50 cursor-pointer" data-filter-depto="' + d.depto + '">' +
+        '<td class="py-2 pl-1 text-sm font-medium text-slate-800">' + d.depto + '</td>' +
+        cellMoney(d.N) + cellMoney(d.T) + cellMoney(d.I) +
+        '<td class="py-2 pr-1 text-right text-xs font-bold tabular-nums ' + moneyClass(d.total) + '">' + fmtMoney(d.total) + '</td></tr>';
+    }).join('') || '<tr><td colspan="5" class="py-4 text-sm text-slate-400 text-center">Nenhum dado</td></tr>';
 
-    el('rank-deptos').querySelectorAll('[data-filter-depto]').forEach(function (btn) {
-      btn.addEventListener('click', function () {
-        filters.depto = btn.dataset.filterDepto;
+    el('rank-deptos').querySelectorAll('[data-filter-depto]').forEach(function (row) {
+      row.addEventListener('click', function () {
+        filters.depto = row.dataset.filterDepto;
         el('f-depto').value = filters.depto;
         applyFilters();
       });
@@ -376,19 +390,18 @@
   }
 
   function renderRegionais(agg) {
-    var list = agg.regionais.slice().sort(function (a, b) { return a.resultado - b.resultado; });
-    el('rank-regionais').innerHTML = list.map(function (r, i) {
-      return '<button class="w-full text-left px-4 py-3 hover:bg-slate-50 transition flex items-start gap-3" data-filter-reg="' + r.regional + '">' +
-        '<span class="text-xs font-bold text-slate-300 w-5 shrink-0 mt-0.5">' + (i + 1) + '</span>' +
-        '<div class="flex-1 min-w-0"><p class="text-sm font-semibold text-slate-800">' + r.regional + '</p>' +
-        '<p class="text-[11px] text-slate-400">' + r.nLojas + ' lojas · ' + r.qtd.toLocaleString('pt-BR') + ' lanç.</p></div>' +
-        '<div class="text-right shrink-0"><p class="text-sm font-bold tabular-nums ' + (r.resultado < 0 ? 'text-falta' : 'text-sobra') + '">' + fmtMoney(r.resultado) + '</p>' +
-        '<p class="text-[10px] text-slate-400">S ' + fmtMoneyAbs(r.sobras) + ' · F ' + fmtMoneyAbs(r.faltas) + '</p></div></button>';
-    }).join('') || '<p class="p-4 text-sm text-slate-400">Nenhum dado</p>';
+    var list = agg.regionais.slice().sort(function (a, b) { return a.total - b.total; });
+    el('rank-regionais').innerHTML = list.map(function (r) {
+      return '<tr class="border-t border-slate-50 hover:bg-slate-50 cursor-pointer" data-filter-reg="' + r.regional + '">' +
+        '<td class="py-2 pl-1 text-sm font-medium text-slate-800">' + r.regional +
+        ' <span class="text-[10px] text-slate-400 font-normal">(' + r.nLojas + ' lojas)</span></td>' +
+        cellMoney(r.N) + cellMoney(r.T) + cellMoney(r.I) +
+        '<td class="py-2 pr-1 text-right text-xs font-bold tabular-nums ' + moneyClass(r.total) + '">' + fmtMoney(r.total) + '</td></tr>';
+    }).join('') || '<tr><td colspan="5" class="py-4 text-sm text-slate-400 text-center">Nenhum dado</td></tr>';
 
-    el('rank-regionais').querySelectorAll('[data-filter-reg]').forEach(function (btn) {
-      btn.addEventListener('click', function () {
-        filters.regional = btn.dataset.filterReg;
+    el('rank-regionais').querySelectorAll('[data-filter-reg]').forEach(function (row) {
+      row.addEventListener('click', function () {
+        filters.regional = row.dataset.filterReg;
         el('f-regional').value = filters.regional;
         applyFilters();
       });
@@ -399,16 +412,17 @@
     var n = parseInt(el('top-n-faltas').value, 10);
     var list = agg.topFaltas.slice(0, n);
     el('rank-faltas').innerHTML = list.map(function (p, i) {
-      return '<button class="w-full text-left px-4 py-3 hover:bg-red-50/50 transition" data-prod="' + p.cod + '" data-loja="' + p.loja + '">' +
-        '<div class="flex items-start gap-3"><span class="text-xs font-bold text-red-300 w-5 shrink-0 mt-0.5">' + (i + 1) + '</span>' +
+      return '<button class="w-full text-left px-4 py-3 hover:bg-red-50/40 transition" data-prod="' + p.cod + '">' +
+        '<div class="flex items-start gap-3">' +
+        '<span class="text-xs font-bold text-red-300 w-5 shrink-0 mt-0.5">' + (i + 1) + '</span>' +
         '<div class="flex-1 min-w-0"><p class="text-sm font-medium text-slate-800 line-clamp-2">' + p.produto + '</p>' +
-        '<p class="text-[11px] text-slate-400 mt-0.5">' + p.loja + ' · ' + p.depto + ' · Cód ' + p.cod + '</p></div>' +
+        '<p class="text-[11px] text-slate-400 mt-0.5">' + (p.depto || '') + ' · Cód ' + p.cod + '</p></div>' +
         '<div class="text-right shrink-0"><p class="text-sm font-bold text-falta tabular-nums">' + fmtMoney(p.valor) + '</p>' +
         '<p class="text-[10px] text-slate-400">' + fmt(p.qtde, 2) + ' un</p></div></div></button>';
     }).join('') || '<p class="p-4 text-sm text-slate-400">Nenhuma falta no filtro</p>';
 
     el('rank-faltas').querySelectorAll('[data-prod]').forEach(function (btn) {
-      btn.addEventListener('click', function () { openProductModal(btn.dataset.prod, btn.dataset.loja); });
+      btn.addEventListener('click', function () { openProductModal(btn.dataset.prod); });
     });
   }
 
@@ -416,49 +430,52 @@
     var n = parseInt(el('top-n-sobras').value, 10);
     var list = agg.topSobras.slice(0, n);
     el('rank-sobras').innerHTML = list.map(function (p, i) {
-      return '<button class="w-full text-left px-4 py-3 hover:bg-emerald-50/50 transition" data-prod="' + p.cod + '" data-loja="' + p.loja + '">' +
-        '<div class="flex items-start gap-3"><span class="text-xs font-bold text-emerald-300 w-5 shrink-0 mt-0.5">' + (i + 1) + '</span>' +
+      return '<button class="w-full text-left px-4 py-3 hover:bg-emerald-50/40 transition" data-prod="' + p.cod + '">' +
+        '<div class="flex items-start gap-3">' +
+        '<span class="text-xs font-bold text-emerald-300 w-5 shrink-0 mt-0.5">' + (i + 1) + '</span>' +
         '<div class="flex-1 min-w-0"><p class="text-sm font-medium text-slate-800 line-clamp-2">' + p.produto + '</p>' +
-        '<p class="text-[11px] text-slate-400 mt-0.5">' + p.loja + ' · ' + p.depto + ' · Cód ' + p.cod + '</p></div>' +
+        '<p class="text-[11px] text-slate-400 mt-0.5">' + (p.depto || '') + ' · Cód ' + p.cod + '</p></div>' +
         '<div class="text-right shrink-0"><p class="text-sm font-bold text-sobra tabular-nums">' + fmtMoney(p.valor) + '</p>' +
         '<p class="text-[10px] text-slate-400">' + fmt(p.qtde, 2) + ' un</p></div></div></button>';
     }).join('') || '<p class="p-4 text-sm text-slate-400">Nenhuma sobra no filtro</p>';
 
     el('rank-sobras').querySelectorAll('[data-prod]').forEach(function (btn) {
-      btn.addEventListener('click', function () { openProductModal(btn.dataset.prod, btn.dataset.loja); });
+      btn.addEventListener('click', function () { openProductModal(btn.dataset.prod); });
     });
   }
 
-  function openProductModal(cod, loja) {
-    var items = filtered.filter(function (r) { return r.cod_produto === cod && (!loja || r.loja === loja); });
+  function openProductModal(cod) {
+    var items = filtered.filter(function (r) { return r.cod_produto === cod; });
     if (!items.length) return;
     var first = items[0];
     var sobras = 0, faltas = 0, qS = 0, qF = 0;
     var tipos = new Set();
+    var byLoja = new Map();
     items.forEach(function (r) {
       if (r.natureza === 'S') { sobras += r.valor; qS += r.qtde; }
       else { faltas += r.valor; qF += r.qtde; }
       tipos.add(TIPO_LABEL[r.tipo] || r.tipo);
+      if (!byLoja.has(r.loja)) byLoja.set(r.loja, 0);
+      byLoja.set(r.loja, byLoja.get(r.loja) + r.valor);
     });
     var resultado = sobras + faltas;
-    var hist = items.slice().sort(function (a, b) { return b.data.localeCompare(a.data); }).slice(0, 30).map(function (r) {
-      return '<tr class="border-t border-slate-50"><td class="py-1.5 pr-2 text-xs text-slate-500 whitespace-nowrap">' + r.data + '</td>' +
-        '<td class="py-1.5 pr-2 text-xs">' + r.loja + '</td><td class="py-1.5 pr-2 text-xs">' + (TIPO_LABEL[r.tipo] || r.tipo) + '</td>' +
-        '<td class="py-1.5 text-right text-xs font-medium tabular-nums ' + (r.natureza === 'F' ? 'text-falta' : 'text-sobra') + '">' + fmtMoney(r.valor) + '</td></tr>';
+
+    var lojaRows = Array.from(byLoja.entries()).sort(function (a, b) { return a[1] - b[1]; }).map(function (e) {
+      return '<tr class="border-t border-slate-50"><td class="py-1.5 text-xs">' + e[0] + '</td>' +
+        '<td class="py-1.5 text-right text-xs font-medium tabular-nums ' + moneyClass(e[1]) + '">' + fmtMoney(e[1]) + '</td></tr>';
     }).join('');
 
     el('modal-body').innerHTML =
       '<p class="text-base font-semibold text-slate-900 leading-snug">' + first.produto + '</p>' +
       '<p class="text-xs text-slate-400 mt-1">Cód ' + first.cod_produto + ' · ' + first.depto + '</p>' +
       '<div class="grid grid-cols-3 gap-2 mt-4">' +
-      '<div class="rounded-xl bg-emerald-50 p-3 text-center"><p class="text-[10px] text-emerald-600 font-medium uppercase">Sobras</p><p class="text-sm font-bold text-sobra mt-0.5">' + fmtMoney(sobras) + '</p><p class="text-[10px] text-slate-400">' + fmt(qS, 1) + ' un</p></div>' +
-      '<div class="rounded-xl bg-red-50 p-3 text-center"><p class="text-[10px] text-red-600 font-medium uppercase">Faltas</p><p class="text-sm font-bold text-falta mt-0.5">' + fmtMoney(faltas) + '</p><p class="text-[10px] text-slate-400">' + fmt(qF, 1) + ' un</p></div>' +
-      '<div class="rounded-xl bg-slate-50 p-3 text-center"><p class="text-[10px] text-slate-500 font-medium uppercase">Resultado</p><p class="text-sm font-bold mt-0.5 ' + (resultado < 0 ? 'text-falta' : 'text-sobra') + '">' + fmtMoney(resultado) + '</p><p class="text-[10px] text-slate-400">' + items.length + ' lanç.</p></div>' +
-      '</div><p class="text-xs text-slate-500 mt-3"><span class="font-medium">Tipos:</span> ' + Array.from(tipos).join(', ') + '</p>' +
-      '<h4 class="text-xs font-semibold text-slate-600 mt-4 mb-2 uppercase tracking-wide">Histórico (últimos 30)</h4>' +
-      '<div class="overflow-x-auto"><table class="w-full text-left"><thead><tr class="text-[10px] text-slate-400 uppercase">' +
-      '<th class="pb-1 font-medium">Data</th><th class="pb-1 font-medium">Loja</th><th class="pb-1 font-medium">Tipo</th><th class="pb-1 font-medium text-right">Valor</th>' +
-      '</tr></thead><tbody>' + hist + '</tbody></table></div>';
+      '<div class="rounded-xl bg-emerald-50 p-3 text-center"><p class="text-[10px] text-emerald-600 font-medium uppercase">Sobras</p><p class="text-sm font-bold text-sobra mt-0.5">' + fmtMoney(sobras) + '</p></div>' +
+      '<div class="rounded-xl bg-red-50 p-3 text-center"><p class="text-[10px] text-red-600 font-medium uppercase">Faltas</p><p class="text-sm font-bold text-falta mt-0.5">' + fmtMoney(faltas) + '</p></div>' +
+      '<div class="rounded-xl bg-slate-50 p-3 text-center"><p class="text-[10px] text-slate-500 font-medium uppercase">Resultado</p><p class="text-sm font-bold mt-0.5 ' + moneyClass(resultado) + '">' + fmtMoney(resultado) + '</p></div>' +
+      '</div>' +
+      '<p class="text-xs text-slate-500 mt-3"><span class="font-medium">Tipos:</span> ' + Array.from(tipos).join(', ') + ' · ' + items.length + ' lanç.</p>' +
+      '<h4 class="text-xs font-semibold text-slate-600 mt-4 mb-2 uppercase tracking-wide">Por loja</h4>' +
+      '<table class="w-full"><thead><tr class="text-[10px] text-slate-400 uppercase"><th class="pb-1 font-medium text-left">Loja</th><th class="pb-1 font-medium text-right">Resultado</th></tr></thead><tbody>' + lojaRows + '</tbody></table>';
     el('modal').classList.remove('hidden');
   }
 
@@ -470,14 +487,14 @@
       return [r.regional, r.loja, r.mes, r.data, r.depto, r.cod_produto, '"' + (r.produto || '').replace(/"/g, '""') + '"',
         r.cod_dcto, TIPO_LABEL[r.tipo] || r.tipo, r.natureza === 'S' ? 'Sobra' : 'Falta', r.valor, r.qtde].join(';');
     });
-    var bom = '\uFEFF';
-    var blob = new Blob([bom + headers.join(';') + '\n' + rows.join('\n')], { type: 'text/csv;charset=utf-8' });
+    var blob = new Blob(['\uFEFF' + headers.join(';') + '\n' + rows.join('\n')], { type: 'text/csv;charset=utf-8' });
     var a = document.createElement('a');
     a.href = URL.createObjectURL(blob);
     a.download = 'inventarios_filtrado_' + new Date().toISOString().slice(0, 10) + '.csv';
     a.click();
   }
 
+  // Events
   el('btn-filters').addEventListener('click', openDrawer);
   el('btn-close-drawer').addEventListener('click', closeDrawer);
   el('drawer-overlay').addEventListener('click', closeDrawer);
@@ -490,14 +507,13 @@
   el('modal-close').addEventListener('click', closeModal);
   el('modal-overlay').addEventListener('click', closeModal);
 
-  document.querySelectorAll('.metric-btn').forEach(function (btn) {
+  document.querySelectorAll('.evol-btn').forEach(function (btn) {
     btn.addEventListener('click', function () {
-      metric = btn.dataset.metric;
-      document.querySelectorAll('.metric-btn').forEach(function (b) {
-        b.classList.toggle('bg-white', b === btn);
-        b.classList.toggle('shadow', b === btn);
-        b.classList.toggle('text-slate-800', b === btn);
-        b.classList.toggle('text-slate-500', b !== btn);
+      evolTipo = btn.dataset.evol;
+      document.querySelectorAll('.evol-btn').forEach(function (b) {
+        b.classList.toggle('chip-active', b === btn);
+        b.classList.toggle('bg-slate-100', b !== btn);
+        b.classList.toggle('text-slate-600', b !== btn);
       });
       renderChart(aggregate());
     });
