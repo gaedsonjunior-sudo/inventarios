@@ -287,14 +287,14 @@
 
   function renderKPIs(agg) {
     var t = agg.byTipo;
-    el('kpi-total').textContent = fmtMoney(t.total);
-    el('kpi-total').className = 'mt-1 text-xl font-bold tabular-nums ' + moneyClass(t.total);
-    el('kpi-normal').textContent = fmtMoney(t.N);
-    el('kpi-normal').className = 'mt-1 text-xl font-bold tabular-nums ' + moneyClass(t.N);
-    el('kpi-top20').textContent = fmtMoney(t.T);
-    el('kpi-top20').className = 'mt-1 text-xl font-bold tabular-nums ' + moneyClass(t.T);
-    el('kpi-inv').textContent = fmtMoney(t.I);
-    el('kpi-inv').className = 'mt-1 text-xl font-bold tabular-nums ' + moneyClass(t.I);
+    el('kpi-total').textContent = fmtMoneyCompact(t.total);
+    el('kpi-total').className = 'mt-1 text-lg sm:text-xl font-bold tabular-nums whitespace-nowrap ' + moneyClass(t.total);
+    el('kpi-normal').textContent = fmtMoneyCompact(t.N);
+    el('kpi-normal').className = 'mt-1 text-lg sm:text-xl font-bold tabular-nums whitespace-nowrap ' + moneyClass(t.N);
+    el('kpi-top20').textContent = fmtMoneyCompact(t.T);
+    el('kpi-top20').className = 'mt-1 text-lg sm:text-xl font-bold tabular-nums whitespace-nowrap ' + moneyClass(t.T);
+    el('kpi-inv').textContent = fmtMoneyCompact(t.I);
+    el('kpi-inv').className = 'mt-1 text-lg sm:text-xl font-bold tabular-nums whitespace-nowrap ' + moneyClass(t.I);
   }
 
   function renderChart(agg) {
@@ -326,19 +326,23 @@
           legend: { display: false },
           tooltip: {
             callbacks: {
-              label: function (ctx) { return label + ': ' + fmtMoney(ctx.parsed.y); }
+              label: function (ctx) { return label + ': ' + fmtMoneyCompact(ctx.parsed.y); }
             }
           },
           datalabels: {
-            anchor: 'end',
-            align: 'end',
+            anchor: function (context) {
+              return context.dataset.data[context.dataIndex] < 0 ? 'end' : 'start';
+            },
+            align: function (context) {
+              return context.dataset.data[context.dataIndex] < 0 ? 'bottom' : 'top';
+            },
             color: '#374151',
             font: {
               size: 10,
               weight: 'bold'
             },
             formatter: function (value) {
-              return fmtMoney(value);
+              return fmtMoneyCompact(value);
             },
             display: function (context) {
               return context.dataset.data[context.dataIndex] !== 0;
@@ -361,7 +365,7 @@
   }
 
   function cellMoney(v) {
-    return '<td class="py-2 text-right text-xs font-semibold tabular-nums ' + moneyClass(v) + '">' + fmtMoneyCompact(v) + '</td>';
+    return '<td class="py-2 text-center text-xs font-semibold tabular-nums whitespace-nowrap ' + moneyClass(v) + '">' + fmtMoneyCompact(v) + '</td>';
   }
 
   function renderLojas(agg) {
@@ -373,9 +377,9 @@
 
     el('rank-lojas').innerHTML = list.map(function (l) {
       return '<tr class="border-t border-slate-50 hover:bg-slate-50 cursor-pointer" data-filter-loja="' + l.loja + '">' +
-        '<td class="py-2 pl-1 text-sm font-medium text-slate-800">' + l.loja + '</td>' +
+        '<td class="py-2 pl-1 text-sm font-medium text-slate-800 text-left whitespace-nowrap">' + l.loja + '</td>' +
         cellMoney(l.N) + cellMoney(l.T) + cellMoney(l.I) +
-        '<td class="py-2 pr-1 text-right text-xs font-bold tabular-nums ' + moneyClass(l.total) + '">' + fmtMoneyCompact(l.total) + '</td></tr>';
+        '<td class="py-2 pr-1 text-center text-xs font-bold tabular-nums whitespace-nowrap ' + moneyClass(l.total) + '">' + fmtMoneyCompact(l.total) + '</td></tr>';
     }).join('') || '<tr><td colspan="5" class="py-4 text-sm text-slate-400 text-center">Nenhum dado</td></tr>';
 
     el('rank-lojas').querySelectorAll('[data-filter-loja]').forEach(function (row) {
@@ -391,9 +395,9 @@
     var list = agg.deptos.slice().sort(function (a, b) { return a.total - b.total; });
     el('rank-deptos').innerHTML = list.map(function (d) {
       return '<tr class="border-t border-slate-50 hover:bg-slate-50 cursor-pointer" data-filter-depto="' + d.depto + '">' +
-        '<td class="py-2 pl-1 text-sm font-medium text-slate-800">' + d.depto + '</td>' +
+        '<td class="py-2 pl-1 text-sm font-medium text-slate-800 text-left whitespace-nowrap">' + d.depto + '</td>' +
         cellMoney(d.N) + cellMoney(d.T) + cellMoney(d.I) +
-        '<td class="py-2 pr-1 text-right text-xs font-bold tabular-nums ' + moneyClass(d.total) + '">' + fmtMoneyCompact(d.total) + '</td></tr>';
+        '<td class="py-2 pr-1 text-center text-xs font-bold tabular-nums whitespace-nowrap ' + moneyClass(d.total) + '">' + fmtMoneyCompact(d.total) + '</td></tr>';
     }).join('') || '<tr><td colspan="5" class="py-4 text-sm text-slate-400 text-center">Nenhum dado</td></tr>';
 
     el('rank-deptos').querySelectorAll('[data-filter-depto]').forEach(function (row) {
@@ -409,10 +413,10 @@
     var list = agg.regionais.slice().sort(function (a, b) { return a.total - b.total; });
     el('rank-regionais').innerHTML = list.map(function (r) {
       return '<tr class="border-t border-slate-50 hover:bg-slate-50 cursor-pointer" data-filter-reg="' + r.regional + '">' +
-        '<td class="py-2 pl-1 text-sm font-medium text-slate-800">' + r.regional +
+        '<td class="py-2 pl-1 text-sm font-medium text-slate-800 text-left whitespace-nowrap">' + r.regional +
         ' <span class="text-[10px] text-slate-400 font-normal">(' + r.nLojas + ' lojas)</span></td>' +
         cellMoney(r.N) + cellMoney(r.T) + cellMoney(r.I) +
-        '<td class="py-2 pr-1 text-right text-xs font-bold tabular-nums ' + moneyClass(r.total) + '">' + fmtMoneyCompact(r.total) + '</td></tr>';
+        '<td class="py-2 pr-1 text-center text-xs font-bold tabular-nums whitespace-nowrap ' + moneyClass(r.total) + '">' + fmtMoneyCompact(r.total) + '</td></tr>';
     }).join('') || '<tr><td colspan="5" class="py-4 text-sm text-slate-400 text-center">Nenhum dado</td></tr>';
 
     el('rank-regionais').querySelectorAll('[data-filter-reg]').forEach(function (row) {
@@ -433,7 +437,7 @@
         '<span class="text-xs font-bold text-red-300 w-5 shrink-0 mt-0.5">' + (i + 1) + '</span>' +
         '<div class="flex-1 min-w-0"><p class="text-sm font-medium text-slate-800 line-clamp-2">' + p.produto + '</p>' +
         '<p class="text-[11px] text-slate-400 mt-0.5">' + (p.depto || '') + ' · Cód ' + p.cod + '</p></div>' +
-        '<div class="text-right shrink-0"><p class="text-sm font-bold text-falta tabular-nums">' + fmtMoney(p.valor) + '</p>' +
+        '<div class="text-right shrink-0"><p class="text-sm font-bold text-falta tabular-nums whitespace-nowrap">' + fmtMoneyCompact(p.valor) + '</p>' +
         '<p class="text-[10px] text-slate-400">' + fmt(p.qtde, 2) + ' un</p></div></div></button>';
     }).join('') || '<p class="p-4 text-sm text-slate-400">Nenhuma falta no filtro</p>';
 
@@ -451,7 +455,7 @@
         '<span class="text-xs font-bold text-emerald-300 w-5 shrink-0 mt-0.5">' + (i + 1) + '</span>' +
         '<div class="flex-1 min-w-0"><p class="text-sm font-medium text-slate-800 line-clamp-2">' + p.produto + '</p>' +
         '<p class="text-[11px] text-slate-400 mt-0.5">' + (p.depto || '') + ' · Cód ' + p.cod + '</p></div>' +
-        '<div class="text-right shrink-0"><p class="text-sm font-bold text-sobra tabular-nums">' + fmtMoney(p.valor) + '</p>' +
+        '<div class="text-right shrink-0"><p class="text-sm font-bold text-sobra tabular-nums whitespace-nowrap">' + fmtMoneyCompact(p.valor) + '</p>' +
         '<p class="text-[10px] text-slate-400">' + fmt(p.qtde, 2) + ' un</p></div></div></button>';
     }).join('') || '<p class="p-4 text-sm text-slate-400">Nenhuma sobra no filtro</p>';
 
@@ -478,16 +482,16 @@
 
     var lojaRows = Array.from(byLoja.entries()).sort(function (a, b) { return a[1] - b[1]; }).map(function (e) {
       return '<tr class="border-t border-slate-50"><td class="py-1.5 text-xs">' + e[0] + '</td>' +
-        '<td class="py-1.5 text-right text-xs font-medium tabular-nums ' + moneyClass(e[1]) + '">' + fmtMoney(e[1]) + '</td></tr>';
+        '<td class="py-1.5 text-right text-xs font-medium tabular-nums whitespace-nowrap ' + moneyClass(e[1]) + '">' + fmtMoneyCompact(e[1]) + '</td></tr>';
     }).join('');
 
     el('modal-body').innerHTML =
       '<p class="text-base font-semibold text-slate-900 leading-snug">' + first.produto + '</p>' +
       '<p class="text-xs text-slate-400 mt-1">Cód ' + first.cod_produto + ' · ' + first.depto + '</p>' +
       '<div class="grid grid-cols-3 gap-2 mt-4">' +
-      '<div class="rounded-xl bg-emerald-50 p-3 text-center"><p class="text-[10px] text-emerald-600 font-medium uppercase">Sobras</p><p class="text-sm font-bold text-sobra mt-0.5">' + fmtMoney(sobras) + '</p></div>' +
-      '<div class="rounded-xl bg-red-50 p-3 text-center"><p class="text-[10px] text-red-600 font-medium uppercase">Faltas</p><p class="text-sm font-bold text-falta mt-0.5">' + fmtMoney(faltas) + '</p></div>' +
-      '<div class="rounded-xl bg-slate-50 p-3 text-center"><p class="text-[10px] text-slate-500 font-medium uppercase">Resultado</p><p class="text-sm font-bold mt-0.5 ' + moneyClass(resultado) + '">' + fmtMoney(resultado) + '</p></div>' +
+      '<div class="rounded-xl bg-emerald-50 p-3 text-center"><p class="text-[10px] text-emerald-600 font-medium uppercase">Sobras</p><p class="text-sm font-bold text-sobra mt-0.5">' + fmtMoneyCompact(sobras) + '</p></div>' +
+      '<div class="rounded-xl bg-red-50 p-3 text-center"><p class="text-[10px] text-red-600 font-medium uppercase">Faltas</p><p class="text-sm font-bold text-falta mt-0.5">' + fmtMoneyCompact(faltas) + '</p></div>' +
+      '<div class="rounded-xl bg-slate-50 p-3 text-center"><p class="text-[10px] text-slate-500 font-medium uppercase">Resultado</p><p class="text-sm font-bold mt-0.5 ' + moneyClass(resultado) + '">' + fmtMoneyCompact(resultado) + '</p></div>' +
       '</div>' +
       '<p class="text-xs text-slate-500 mt-3"><span class="font-medium">Tipos:</span> ' + Array.from(tipos).join(', ') + ' · ' + items.length + ' lanç.</p>' +
       '<h4 class="text-xs font-semibold text-slate-600 mt-4 mb-2 uppercase tracking-wide">Por loja</h4>' +
