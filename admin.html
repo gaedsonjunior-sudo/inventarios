@@ -214,7 +214,8 @@
             deptos: unique(out.map(function (x) { return x.dp; }).filter(Boolean)),
             meses: unique(out.map(function (x) { return x.m; }).filter(Boolean)),
             data_min: out.length ? out.map(function (x) { return x.d; }).sort()[0] : '',
-            data_max: out.length ? out.map(function (x) { return x.d; }).sort().reverse()[0] : ''
+            data_max: out.length ? out.map(function (x) { return x.d; }).sort().reverse()[0] : '',
+            atualizado_em: new Date().toISOString()
           };
 
           lastPayload = { meta: meta, data: out };

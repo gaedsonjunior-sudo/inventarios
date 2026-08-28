@@ -80,6 +80,17 @@
           };
         });
         el('loading').style.display = 'none';
+        if (META.atualizado_em) {
+          var dataAtual = new Date(META.atualizado_em);
+          var dataFormatada = dataAtual.toLocaleDateString('pt-BR', { 
+            day: '2-digit', 
+            month: '2-digit', 
+            year: 'numeric',
+            hour: '2-digit',
+            minute: '2-digit'
+          });
+          el('header-sub').textContent = 'Atualizado em ' + dataFormatada;
+        }
         initFilters();
         applyFilters();
       } catch (err) {

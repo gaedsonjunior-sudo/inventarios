@@ -49,6 +49,7 @@
         </div>
         <div class="min-w-0">
           <h1 class="text-xs sm:text-sm font-bold text-slate-900 truncate">Inventários & Ajustes</h1>
+          <p class="text-[10px] text-slate-500 truncate" id="header-sub">—</p>
         </div>
       </div>
       <div class="flex items-center gap-1 sm:gap-2">
@@ -107,19 +108,21 @@
             <option value="nome">Nome</option>
           </select>
         </div>
-        <div class="px-2 sm:px-3 py-2 overflow-x-auto">
-          <table class="w-full text-left min-w-[380px] sm:min-w-[480px]">
-            <thead>
-              <tr class="text-[10px] text-slate-400 uppercase">
-                <th class="pb-2 font-medium pl-1 text-left">Loja</th>
-                <th class="pb-2 font-medium text-center">Normal</th>
-                <th class="pb-2 font-medium text-center">TOP20</th>
-                <th class="pb-2 font-medium text-center">Inv.</th>
-                <th class="pb-2 font-medium text-center pr-1">Total</th>
-              </tr>
-            </thead>
-            <tbody id="rank-lojas"></tbody>
-          </table>
+        <div class="px-2 sm:px-3 py-2">
+          <div class="overflow-x-auto overflow-y-auto scrollbar-thin" style="max-height: 340px;">
+            <table class="w-full text-left min-w-[380px] sm:min-w-[480px]">
+              <thead>
+                <tr class="text-[10px] text-slate-400 uppercase sticky top-0 bg-white">
+                  <th class="pb-2 font-medium pl-1 text-left">Loja</th>
+                  <th class="pb-2 font-medium text-center">Normal</th>
+                  <th class="pb-2 font-medium text-center">TOP20</th>
+                  <th class="pb-2 font-medium text-center">Inv.</th>
+                  <th class="pb-2 font-medium text-center pr-1">Total</th>
+                </tr>
+              </thead>
+              <tbody id="rank-lojas"></tbody>
+            </table>
+          </div>
         </div>
       </section>
 
@@ -127,19 +130,21 @@
         <div class="px-3 sm:px-4 py-2 sm:py-3 border-b border-slate-100">
           <h2 class="text-sm font-semibold text-slate-800">Departamentos</h2>
         </div>
-        <div class="px-2 sm:px-3 py-2 overflow-x-auto">
-          <table class="w-full text-left min-w-[360px] sm:min-w-[420px]">
-            <thead>
-              <tr class="text-[10px] text-slate-400 uppercase">
-                <th class="pb-2 font-medium pl-1 text-left">Depto</th>
-                <th class="pb-2 font-medium text-center">Normal</th>
-                <th class="pb-2 font-medium text-center">TOP20</th>
-                <th class="pb-2 font-medium text-center">Inv.</th>
-                <th class="pb-2 font-medium text-center pr-1">Total</th>
-              </tr>
-            </thead>
-            <tbody id="rank-deptos"></tbody>
-          </table>
+        <div class="px-2 sm:px-3 py-2">
+          <div class="overflow-x-auto overflow-y-auto scrollbar-thin" style="max-height: 280px;">
+            <table class="w-full text-left min-w-[360px] sm:min-w-[420px]">
+              <thead>
+                <tr class="text-[10px] text-slate-400 uppercase sticky top-0 bg-white">
+                  <th class="pb-2 font-medium pl-1 text-left">Depto</th>
+                  <th class="pb-2 font-medium text-center">Normal</th>
+                  <th class="pb-2 font-medium text-center">TOP20</th>
+                  <th class="pb-2 font-medium text-center">Inv.</th>
+                  <th class="pb-2 font-medium text-center pr-1">Total</th>
+                </tr>
+              </thead>
+              <tbody id="rank-deptos"></tbody>
+            </table>
+          </div>
         </div>
       </section>
     </div>
