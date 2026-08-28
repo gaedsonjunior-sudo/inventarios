@@ -68,36 +68,92 @@
     pct.textContent = 'Verificando base atualizada...';
     loadFromIDB().then(function (idbData) {
       try {
-        var parsed = idbData || window.APP_DATA;
-        if (!parsed) throw new Error('Nenhuma base encontrada (data.js ou IndexedDB).');
-        pct.textContent = 'Processando...';
-        META = parsed.meta;
-        RAW = parsed.data.map(function (r) {
-          return {
-            regional: r.r, loja: r.l, mes: r.m, data: r.d,
-            cod_depto: r.cd, depto: r.dp, cod_produto: r.cp, produto: r.p,
-            cod_dcto: r.dc, tipo: r.t, natureza: r.n, valor: r.v, qtde: r.q
-          };
-        });
-        el('loading').style.display = 'none';
-        if (META.atualizado_em) {
-          var dataAtual = new Date(META.atualizado_em);
-          var dataFormatada = dataAtual.toLocaleDateString('pt-BR', { 
-            day: '2-digit', 
-            month: '2-digit', 
-            year: 'numeric',
-            hour: '2-digit',
-            minute: '2-digit'
-          });
-          el('header-sub').textContent = 'Atualizado em ' + dataFormatada;
+        var parsed = idbData;
+        if (!parsed) {
+          // Tentar carregar arquivo comprimido ou normal
+          loadFromExternal();
+          return;
         }
-        initFilters();
-        applyFilters();
+        processData(parsed);
       } catch (err) {
         console.error(err);
         pct.textContent = 'Erro: ' + err.message;
       }
     });
+  }
+
+  function loadFromExternal() {
+    var pct = el('load-pct');
+    pct.textContent = 'Carregando base de dados...';
+    
+    // Primeiro tenta carregar arquivo comprimido
+    fetch('data.js.gz')
+      .then(function (response) {
+        if (!response.ok) throw new Error('Arquivo comprimido não encontrado');
+        return response.body.pipeThrough(new DecompressionStream('gzip')).getReader();
+      })
+      .then(function (reader) {
+        var chunks = [];
+        return reader.read().then(function pump({ done, value }) {
+          if (done) {
+            var jsonString = new TextDecoder().decode(new Uint8Array(chunks.reduce(function (acc, chunk) { 
+              var temp = new Uint8Array(acc.length + chunk.length);
+              temp.set(acc);
+              temp.set(chunk, acc.length);
+              return temp;
+            }, new Uint8Array(0))));
+            var parsed = JSON.parse(jsonString);
+            processData(parsed);
+            return;
+          }
+          chunks.push(value);
+          return reader.read().then(pump);
+        });
+      })
+      .catch(function () {
+        // Se falhar, tenta carregar arquivo normal
+        pct.textContent = 'Carregando base de dados (legado)...';
+        var script = document.createElement('script');
+        script.src = 'data.js';
+        script.onload = function () {
+          if (window.APP_DATA) {
+            processData(window.APP_DATA);
+          } else {
+            throw new Error('Arquivo data.js não contém dados válidos');
+          }
+        };
+        script.onerror = function () {
+          throw new Error('Erro ao carregar data.js');
+        };
+        document.head.appendChild(script);
+      });
+  }
+
+  function processData(parsed) {
+    var pct = el('load-pct');
+    pct.textContent = 'Processando...';
+    META = parsed.meta;
+    RAW = parsed.data.map(function (r) {
+      return {
+        regional: r.r, loja: r.l, mes: r.m, data: r.d,
+        cod_depto: r.cd, depto: r.dp, cod_produto: r.cp, produto: r.p,
+        cod_dcto: r.dc, tipo: r.t, natureza: r.n, valor: r.v, qtde: r.q
+      };
+    });
+    el('loading').style.display = 'none';
+    if (META.atualizado_em) {
+      var dataAtual = new Date(META.atualizado_em);
+      var dataFormatada = dataAtual.toLocaleDateString('pt-BR', { 
+        day: '2-digit', 
+        month: '2-digit', 
+        year: 'numeric',
+        hour: '2-digit',
+        minute: '2-digit'
+      });
+      el('header-sub').textContent = 'Atualizado em ' + dataFormatada;
+    }
+    initFilters();
+    applyFilters();
   }
 
   function fillSelect(id, options, allLabel) {

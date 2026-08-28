@@ -312,12 +312,28 @@
 
     document.getElementById('btn-download-js').addEventListener('click', function () {
       if (!lastPayload) return;
-      var content = 'window.APP_DATA=' + JSON.stringify(lastPayload) + ';';
-      var blob = new Blob([content], { type: 'application/javascript' });
-      var a = document.createElement('a');
-      a.href = URL.createObjectURL(blob);
-      a.download = 'data.js';
-      a.click();
+      var jsonString = JSON.stringify(lastPayload);
+      
+      // Comprimir usando gzip
+      var blob = new Blob([jsonString], { type: 'application/json' });
+      var stream = blob.stream().pipeThrough(new CompressionStream('gzip'));
+      
+      var compressedChunks = [];
+      var reader = stream.getReader();
+      
+      reader.read().then(function processChunk({ done, value }) {
+        if (done) {
+          // Quando terminar, criar arquivo .js.gz
+          var compressedBlob = new Blob(compressedChunks, { type: 'application/gzip' });
+          var a = document.createElement('a');
+          a.href = URL.createObjectURL(compressedBlob);
+          a.download = 'data.js.gz';
+          a.click();
+          return;
+        }
+        compressedChunks.push(value);
+        return reader.read().then(processChunk);
+      });
     });
   })();
   </script>
