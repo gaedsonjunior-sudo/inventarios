@@ -9,6 +9,7 @@
     data_ini: null, data_fim: null
   };
   var evolTipo = 'ALL';
+  var matrizTipo = 'ALL';
   var chartEvol = null;
   var loadingCount = 0;
   var lastDashboard = null;
@@ -263,7 +264,7 @@
         lastMatriz = await rpc('api_matriz_lojas_mes', {
           p_regional: filters.regional || null,
           p_deptos: (filters.depto && filters.depto.length) ? filters.depto : null,
-          p_tipo: filters.tipo || null,
+          p_tipo: matrizTipo === 'ALL' ? null : matrizTipo,
           p_natureza: filters.natureza || null
         });
         renderMatriz(lastMatriz);
@@ -630,6 +631,37 @@
       });
       if (lastDashboard && lastDashboard.evolucao) renderChart(lastDashboard.evolucao);
       else refreshAll();
+    });
+  });
+
+  document.querySelectorAll('.matriz-btn').forEach(function (btn) {
+    btn.addEventListener('click', async function () {
+      matrizTipo = btn.dataset.matriz;
+      document.querySelectorAll('.matriz-btn').forEach(function (b) {
+        b.classList.toggle('chip-active', b === btn);
+        b.classList.toggle('bg-slate-100', b !== btn);
+        b.classList.toggle('text-slate-600', b !== btn);
+      });
+      // Recarrega só a matriz (mais leve)
+      if (!filters.regional) {
+        renderMatriz(null);
+        return;
+      }
+      try {
+        setLoading(true);
+        lastMatriz = await rpc('api_matriz_lojas_mes', {
+          p_regional: filters.regional || null,
+          p_deptos: (filters.depto && filters.depto.length) ? filters.depto : null,
+          p_tipo: matrizTipo === 'ALL' ? null : matrizTipo,
+          p_natureza: filters.natureza || null
+        });
+        renderMatriz(lastMatriz);
+      } catch (err) {
+        console.error(err);
+        alert('Erro na matriz: ' + err.message);
+      } finally {
+        setLoading(false);
+      }
     });
   });
 

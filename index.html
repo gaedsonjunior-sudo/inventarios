@@ -194,9 +194,17 @@
       <div class="px-3 sm:px-4 py-2 sm:py-3 border-b border-slate-100 flex flex-wrap items-center justify-between gap-2">
         <div>
           <h2 class="text-sm font-semibold text-slate-800">Lojas × Meses</h2>
-          <p class="text-[11px] text-slate-400">Resultado total por loja da regional selecionada</p>
+          <p class="text-[11px] text-slate-400">Por loja da regional · filtro de tipo de ajuste</p>
         </div>
-        <button id="btn-expand-matriz" class="text-[11px] text-brand-600 hover:text-brand-700 font-medium">Ver tudo</button>
+        <div class="flex flex-wrap items-center gap-1.5">
+          <div class="flex flex-wrap gap-1">
+            <button data-matriz="ALL" class="matriz-btn chip-active px-2 py-1 sm:px-2.5 text-[10px] sm:text-[11px] font-medium rounded-lg">Total</button>
+            <button data-matriz="N" class="matriz-btn px-2 py-1 sm:px-2.5 text-[10px] sm:text-[11px] font-medium rounded-lg bg-slate-100 text-slate-600">Normal</button>
+            <button data-matriz="T" class="matriz-btn px-2 py-1 sm:px-2.5 text-[10px] sm:text-[11px] font-medium rounded-lg bg-slate-100 text-slate-600">TOP20</button>
+            <button data-matriz="I" class="matriz-btn px-2 py-1 sm:px-2.5 text-[10px] sm:text-[11px] font-medium rounded-lg bg-slate-100 text-slate-600">Inv. Dept.</button>
+          </div>
+          <button id="btn-expand-matriz" class="text-[11px] text-brand-600 hover:text-brand-700 font-medium ml-1">Ver tudo</button>
+        </div>
       </div>
       <div class="px-2 sm:px-3 py-2 overflow-x-auto overflow-y-auto scrollbar-thin" style="max-height: 360px;" id="matriz-wrap">
         <table class="w-full text-left min-w-[520px]">
