@@ -233,23 +233,27 @@
     var topNS = parseInt((el('top-n-sobras') && el('top-n-sobras').value) || '10', 10);
 
     try {
-      var results = await Promise.all([
-        rpc('api_kpis', p),
-        rpc('api_ranking_lojas', p),
-        rpc('api_ranking_deptos', p),
-        rpc('api_ranking_regionais', p),
-        rpc('api_evolucao', p),
-        rpc('api_top_produtos', Object.assign({}, p, { p_natureza: 'F', p_limit: topN })),
-        rpc('api_top_produtos', Object.assign({}, p, { p_natureza: 'S', p_limit: topNS }))
-      ]);
+      // Sequencial + pequenos grupos para não saturar o pool (timeout)
+      var kpis = await rpc('api_kpis', p);
+      renderKPIs(kpis || {});
 
-      renderKPIs(results[0] || {});
-      renderLojas(results[1] || []);
-      renderDeptos(results[2] || []);
-      renderRegionais(results[3] || []);
-      renderChart(results[4] || []);
-      renderTopFaltas(results[5] || []);
-      renderTopSobras(results[6] || []);
+      var lojas = await rpc('api_ranking_lojas', p);
+      renderLojas(lojas || []);
+
+      var deptos = await rpc('api_ranking_deptos', p);
+      renderDeptos(deptos || []);
+
+      var regionais = await rpc('api_ranking_regionais', p);
+      renderRegionais(regionais || []);
+
+      var evol = await rpc('api_evolucao', p);
+      renderChart(evol || []);
+
+      var faltas = await rpc('api_top_produtos', Object.assign({}, p, { p_natureza: 'F', p_limit: topN }));
+      renderTopFaltas(faltas || []);
+
+      var sobras = await rpc('api_top_produtos', Object.assign({}, p, { p_natureza: 'S', p_limit: topNS }));
+      renderTopSobras(sobras || []);
     } catch (err) {
       console.error(err);
       alert('Erro ao carregar dados: ' + err.message);
