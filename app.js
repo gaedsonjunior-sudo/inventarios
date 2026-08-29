@@ -1,11 +1,11 @@
 (function () {
   'use strict';
 
-  var RAW = [];
+  var sb = null;
   var META = {};
-  var filtered = [];
   var chart = null;
   var evolTipo = 'ALL';
+  var loadingCount = 0;
 
   var filters = {
     regional: '', loja: '', depto: [], mes: '',
@@ -18,183 +18,106 @@
   function fmt(n, dec) {
     if (dec === undefined) dec = 2;
     if (n == null || isNaN(n)) return '—';
-    return n.toLocaleString('pt-BR', { minimumFractionDigits: dec, maximumFractionDigits: dec });
+    return Number(n).toLocaleString('pt-BR', { minimumFractionDigits: dec, maximumFractionDigits: dec });
   }
   function fmtMoney(n) {
     if (n == null || isNaN(n)) return '—';
+    n = Number(n);
     var abs = Math.abs(n);
     var s = abs.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
     return n < 0 ? '-R$ ' + s : 'R$ ' + s;
   }
-  function fmtMoneyCompact(n) {
-    if (n == null || isNaN(n)) return '—';
-    var abs = Math.abs(n);
-    var s = Math.floor(abs).toLocaleString('pt-BR');
-    return s;
-  }
   function moneyClass(n) {
+    n = Number(n) || 0;
     if (n < 0) return 'text-falta';
     if (n > 0) return 'text-sobra';
     return 'text-slate-700';
   }
   function el(id) { return document.getElementById(id); }
 
-  // ── Load (IndexedDB override or data.js) ──
-  function loadFromIDB() {
-    return new Promise(function (resolve) {
-      try {
-        var req = indexedDB.open('painel_estoque', 1);
-        req.onupgradeneeded = function (e) {
-          var db = e.target.result;
-          if (!db.objectStoreNames.contains('base')) db.createObjectStore('base');
-        };
-        req.onsuccess = function (e) {
-          var db = e.target.result;
-          try {
-            var tx = db.transaction('base', 'readonly');
-            var store = tx.objectStore('base');
-            var g = store.get('data');
-            g.onsuccess = function () { resolve(g.result || null); };
-            g.onerror = function () { resolve(null); };
-          } catch (err) { resolve(null); }
-        };
-        req.onerror = function () { resolve(null); };
-      } catch (err) { resolve(null); }
-    });
+  function filterParams() {
+    return {
+      p_regional: filters.regional || null,
+      p_loja: filters.loja || null,
+      p_deptos: filters.depto && filters.depto.length ? filters.depto : null,
+      p_mes: filters.mes || null,
+      p_data_ini: filters.dataIni || null,
+      p_data_fim: filters.dataFim || null,
+      p_tipo: filters.tipo || null,
+      p_natureza: filters.natureza || null,
+      p_produto: filters.produto || null
+    };
   }
 
-  function loadData() {
-    var pct = el('load-pct');
-    pct.textContent = 'Verificando base atualizada...';
-    loadFromIDB().then(function (idbData) {
-      try {
-        var parsed = idbData;
-        if (!parsed) {
-          // Tentar carregar arquivo comprimido ou normal
-          loadFromExternal();
-          return;
-        }
-        processData(parsed);
-      } catch (err) {
-        console.error(err);
-        pct.textContent = 'Erro: ' + err.message;
-      }
-    });
-  }
-
-  function loadFromExternal() {
-    var pct = el('load-pct');
-    pct.textContent = 'Carregando base de dados...';
-    
-    // Primeiro tenta carregar arquivo comprimido
-    fetch('data.js.gz')
-      .then(function (response) {
-        if (!response.ok) throw new Error('Arquivo comprimido não encontrado');
-        return response.body.pipeThrough(new DecompressionStream('gzip')).getReader();
-      })
-      .then(function (reader) {
-        var chunks = [];
-        return reader.read().then(function pump({ done, value }) {
-          if (done) {
-            var jsonString = new TextDecoder().decode(new Uint8Array(chunks.reduce(function (acc, chunk) { 
-              var temp = new Uint8Array(acc.length + chunk.length);
-              temp.set(acc);
-              temp.set(chunk, acc.length);
-              return temp;
-            }, new Uint8Array(0))));
-            var parsed = JSON.parse(jsonString);
-            processData(parsed);
-            return;
-          }
-          chunks.push(value);
-          return reader.read().then(pump);
-        });
-      })
-      .catch(function () {
-        // Se falhar, tenta carregar arquivo normal
-        pct.textContent = 'Carregando base de dados (legado)...';
-        var script = document.createElement('script');
-        script.src = 'data.js';
-        script.onload = function () {
-          if (window.APP_DATA) {
-            processData(window.APP_DATA);
-          } else {
-            throw new Error('Arquivo data.js não contém dados válidos');
-          }
-        };
-        script.onerror = function () {
-          throw new Error('Erro ao carregar data.js');
-        };
-        document.head.appendChild(script);
-      });
-  }
-
-  function processData(parsed) {
-    var pct = el('load-pct');
-    pct.textContent = 'Processando...';
-    META = parsed.meta;
-    RAW = parsed.data.map(function (r) {
-      return {
-        regional: r.r, loja: r.l, mes: r.m, data: r.d,
-        cod_depto: r.cd, depto: r.dp, cod_produto: r.cp, produto: r.p,
-        cod_dcto: r.dc, tipo: r.t, natureza: r.n, valor: r.v, qtde: r.q
-      };
-    });
-    el('loading').style.display = 'none';
-    if (META.atualizado_em) {
-      var dataAtual = new Date(META.atualizado_em);
-      var dataFormatada = dataAtual.toLocaleDateString('pt-BR', { 
-        day: '2-digit', 
-        month: '2-digit', 
-        year: 'numeric',
-        hour: '2-digit',
-        minute: '2-digit'
-      });
-      el('header-sub').textContent = 'Atualizado em ' + dataFormatada;
+  function setLoading(on) {
+    loadingCount += on ? 1 : -1;
+    if (loadingCount < 0) loadingCount = 0;
+    var box = el('loading');
+    if (!box) return;
+    if (loadingCount === 0) box.style.display = 'none';
+    else {
+      box.style.display = 'flex';
+      el('load-pct').textContent = 'Consultando Supabase...';
     }
-    initFilters();
-    applyFilters();
+  }
+
+  async function rpc(name, params) {
+    var res = await sb.rpc(name, params || {});
+    if (res.error) throw new Error(res.error.message || JSON.stringify(res.error));
+    return res.data;
+  }
+
+  // ── Init ──
+  async function init() {
+    if (!window.SUPABASE_URL || window.SUPABASE_URL.indexOf('SEU_PROJECT') >= 0) {
+      el('load-pct').innerHTML = 'Configure <code>config.js</code> com a URL e a anon key do Supabase.';
+      return;
+    }
+    sb = window.supabase.createClient(window.SUPABASE_URL, window.SUPABASE_ANON_KEY);
+    setLoading(true);
+    try {
+      META = await rpc('api_meta');
+      initFilters();
+      el('header-sub').textContent =
+        (META.total || 0).toLocaleString('pt-BR') + ' lançamentos · ' +
+        (META.data_min || '') + ' a ' + (META.data_max || '');
+      await refreshAll();
+    } catch (err) {
+      console.error(err);
+      el('load-pct').textContent = 'Erro: ' + err.message;
+      return;
+    } finally {
+      setLoading(false);
+    }
   }
 
   function fillSelect(id, options, allLabel) {
     allLabel = allLabel || 'Todos';
     var s = el(id);
+    if (!s) return;
     s.innerHTML = '<option value="">' + allLabel + '</option>' +
-      options.map(function (o) { return '<option value="' + o + '">' + o + '</option>'; }).join('');
-  }
-
-  function fillDeptosCheckboxes(containerId, options) {
-    var container = el(containerId);
-    container.innerHTML = options.map(function (o) {
-      return '<label class="flex items-center gap-2 py-1 cursor-pointer hover:bg-slate-50 px-2 rounded">' +
-        '<input type="checkbox" value="' + o + '" class="depto-checkbox rounded border-slate-300 text-brand-600 focus:ring-brand-500">' +
-        '<span class="text-sm text-slate-700">' + o + '</span>' +
-        '</label>';
-    }).join('');
-
-    // Adicionar botão para selecionar todos
-    var selectAllBtn = document.createElement('button');
-    selectAllBtn.className = 'text-xs text-brand-600 hover:text-brand-700 font-medium mt-2 px-2';
-    selectAllBtn.textContent = 'Selecionar todos';
-    selectAllBtn.onclick = function () {
-      var checkboxes = container.querySelectorAll('.depto-checkbox');
-      var allChecked = Array.from(checkboxes).every(function (cb) { return cb.checked; });
-      checkboxes.forEach(function (cb) { cb.checked = !allChecked; });
-      selectAllBtn.textContent = allChecked ? 'Selecionar todos' : 'Limpar seleção';
-    };
-    container.appendChild(selectAllBtn);
+      (options || []).map(function (o) {
+        return '<option value="' + o + '">' + o + '</option>';
+      }).join('');
   }
 
   function initFilters() {
     fillSelect('f-regional', META.regionais || []);
     fillSelect('f-loja', META.lojas || []);
-    fillDeptosCheckboxes('f-depto-container', META.deptos || []);
-    var meses = (META.meses || []).slice().sort(function (a, b) {
-      return MES_ORDER.indexOf(a) - MES_ORDER.indexOf(b);
-    });
-    fillSelect('f-mes', meses);
-    if (META.data_min) el('f-data-ini').min = META.data_min;
-    if (META.data_max) {
+    // depto pode ser multi
+    var deptoSel = el('f-depto');
+    if (deptoSel) {
+      if (deptoSel.multiple) {
+        deptoSel.innerHTML = (META.deptos || []).map(function (o) {
+          return '<option value="' + o + '">' + o + '</option>';
+        }).join('');
+      } else {
+        fillSelect('f-depto', META.deptos || []);
+      }
+    }
+    fillSelect('f-mes', META.meses || []);
+    if (META.data_min && el('f-data-ini')) {
+      el('f-data-ini').min = META.data_min;
       el('f-data-fim').max = META.data_max;
       el('f-data-ini').max = META.data_max;
       el('f-data-fim').min = META.data_min;
@@ -213,44 +136,48 @@
   }
 
   function readFiltersFromUI() {
-    filters.regional = el('f-regional').value;
-    filters.loja = el('f-loja').value;
-    
-    // Ler checkboxes de departamentos
-    var deptoCheckboxes = document.querySelectorAll('.depto-checkbox:checked');
-    filters.depto = Array.from(deptoCheckboxes).map(function (cb) { return cb.value; });
-    
-    filters.mes = el('f-mes').value;
-    filters.dataIni = el('f-data-ini').value;
-    filters.dataFim = el('f-data-fim').value;
-    filters.tipo = el('f-tipo').value;
-    filters.natureza = el('f-natureza').value;
-    filters.produto = el('f-produto').value.trim().toLowerCase();
+    filters.regional = el('f-regional') ? el('f-regional').value : '';
+    filters.loja = el('f-loja') ? el('f-loja').value : '';
+    var deptoEl = el('f-depto');
+    if (deptoEl && deptoEl.multiple) {
+      filters.depto = Array.from(deptoEl.selectedOptions).map(function (o) { return o.value; });
+    } else if (deptoEl) {
+      filters.depto = deptoEl.value ? [deptoEl.value] : [];
+    } else filters.depto = [];
+    filters.mes = el('f-mes') ? el('f-mes').value : '';
+    filters.dataIni = el('f-data-ini') ? el('f-data-ini').value : '';
+    filters.dataFim = el('f-data-fim') ? el('f-data-fim').value : '';
+    filters.tipo = el('f-tipo') ? el('f-tipo').value : '';
+    filters.natureza = el('f-natureza') ? el('f-natureza').value : '';
+    filters.produto = el('f-produto') ? el('f-produto').value.trim().toLowerCase() : '';
   }
 
   function clearFilters() {
-    Object.keys(filters).forEach(function (k) { 
-      if (k === 'depto') filters[k] = [];
-      else filters[k] = ''; 
+    Object.keys(filters).forEach(function (k) {
+      filters[k] = (k === 'depto') ? [] : '';
     });
-    ['f-regional','f-loja','f-mes','f-tipo','f-natureza'].forEach(function (id) { el(id).value = ''; });
-    
-    // Limpar checkboxes de departamento
-    document.querySelectorAll('.depto-checkbox').forEach(function (cb) { cb.checked = false; });
-    
-    el('f-data-ini').value = '';
-    el('f-data-fim').value = '';
-    el('f-produto').value = '';
-    applyFilters();
+    ['f-regional','f-loja','f-mes','f-tipo','f-natureza'].forEach(function (id) {
+      if (el(id)) el(id).value = '';
+    });
+    var deptoEl = el('f-depto');
+    if (deptoEl) {
+      if (deptoEl.multiple) Array.from(deptoEl.options).forEach(function (o) { o.selected = false; });
+      else deptoEl.value = '';
+    }
+    if (el('f-data-ini')) el('f-data-ini').value = '';
+    if (el('f-data-fim')) el('f-data-fim').value = '';
+    if (el('f-produto')) el('f-produto').value = '';
+    refreshAll();
     closeDrawer();
   }
 
   function renderActiveChips() {
     var box = el('active-filters');
+    if (!box) return;
     var chips = [];
     if (filters.regional) chips.push(['Regional', filters.regional, 'regional']);
     if (filters.loja) chips.push(['Loja', filters.loja, 'loja']);
-    if (filters.depto.length > 0) chips.push(['Depto', filters.depto.length + ' selecionados', 'depto']);
+    if (filters.depto && filters.depto.length) chips.push(['Depto', filters.depto.join(', '), 'depto']);
     if (filters.mes) chips.push(['Mês', filters.mes, 'mes']);
     if (filters.dataIni) chips.push(['De', filters.dataIni, 'dataIni']);
     if (filters.dataFim) chips.push(['Até', filters.dataFim, 'dataFim']);
@@ -265,152 +192,167 @@
     }).join('');
 
     var badge = el('filter-badge');
-    if (chips.length) {
-      badge.textContent = chips.length;
-      badge.classList.remove('hidden');
-    } else badge.classList.add('hidden');
+    if (badge) {
+      if (chips.length) {
+        badge.textContent = chips.length;
+        badge.classList.remove('hidden');
+      } else badge.classList.add('hidden');
+    }
 
     box.querySelectorAll('[data-clear]').forEach(function (btn) {
       btn.addEventListener('click', function () {
         var k = btn.dataset.clear;
         if (k === 'depto') {
           filters.depto = [];
-          document.querySelectorAll('.depto-checkbox').forEach(function (cb) { cb.checked = false; });
+          var deptoEl = el('f-depto');
+          if (deptoEl && deptoEl.multiple) Array.from(deptoEl.options).forEach(function (o) { o.selected = false; });
+          else if (deptoEl) deptoEl.value = '';
         } else {
           filters[k] = '';
           var map = { regional:'f-regional', loja:'f-loja', mes:'f-mes', dataIni:'f-data-ini', dataFim:'f-data-fim', tipo:'f-tipo', natureza:'f-natureza', produto:'f-produto' };
-          if (map[k]) el(map[k]).value = '';
+          if (map[k] && el(map[k])) el(map[k]).value = '';
         }
-        applyFilters();
+        refreshAll();
       });
     });
   }
 
-  function applyFilters() {
-    filtered = RAW.filter(function (r) {
-      if (filters.regional && r.regional !== filters.regional) return false;
-      if (filters.loja && r.loja !== filters.loja) return false;
-      if (filters.depto.length > 0 && filters.depto.indexOf(r.depto) === -1) return false;
-      if (filters.mes && r.mes !== filters.mes) return false;
-      if (filters.dataIni && r.data < filters.dataIni) return false;
-      if (filters.dataFim && r.data > filters.dataFim) return false;
-      if (filters.tipo && r.tipo !== filters.tipo) return false;
-      if (filters.natureza && r.natureza !== filters.natureza) return false;
-      if (filters.produto) {
-        var q = filters.produto;
-        if (r.produto.toLowerCase().indexOf(q) === -1 && String(r.cod_produto).indexOf(q) === -1) return false;
-      }
-      return true;
-    });
+  // ── Refresh all cards via RPC ──
+  async function refreshAll() {
     renderActiveChips();
-    renderAll();
-  }
+    setLoading(true);
+    var p = filterParams();
+    var topN = parseInt((el('top-n-faltas') && el('top-n-faltas').value) || '10', 10);
+    var topNS = parseInt((el('top-n-sobras') && el('top-n-sobras').value) || '10', 10);
 
-  // ── Aggregate ──
-  function emptyTipo() { return { N: 0, T: 0, I: 0, total: 0 }; }
+    try {
+      var results = await Promise.all([
+        rpc('api_kpis', p),
+        rpc('api_ranking_lojas', p),
+        rpc('api_ranking_deptos', p),
+        rpc('api_ranking_regionais', p),
+        rpc('api_evolucao', p),
+        rpc('api_top_produtos', Object.assign({}, p, { p_natureza: 'F', p_limit: topN })),
+        rpc('api_top_produtos', Object.assign({}, p, { p_natureza: 'S', p_limit: topNS }))
+      ]);
 
-  function aggregate() {
-    var byTipo = emptyTipo();
-    var lojas = new Map();
-    var deptos = new Map();
-    var regionais = new Map();
-    var meses = new Map();
-    var prodFalta = new Map();
-    var prodSobra = new Map();
-
-    for (var i = 0; i < filtered.length; i++) {
-      var r = filtered[i];
-      var v = r.valor;
-      var t = r.tipo;
-
-      byTipo[t] = (byTipo[t] || 0) + v;
-      byTipo.total += v;
-
-      // Loja
-      if (!lojas.has(r.loja)) lojas.set(r.loja, { loja: r.loja, regional: r.regional, N: 0, T: 0, I: 0, total: 0 });
-      var lj = lojas.get(r.loja);
-      lj[t] += v; lj.total += v;
-
-      // Depto
-      if (!deptos.has(r.depto)) deptos.set(r.depto, { depto: r.depto, N: 0, T: 0, I: 0, total: 0 });
-      var dp = deptos.get(r.depto);
-      dp[t] += v; dp.total += v;
-
-      // Regional
-      if (!regionais.has(r.regional)) regionais.set(r.regional, { regional: r.regional, N: 0, T: 0, I: 0, total: 0, nLojas: new Set() });
-      var rg = regionais.get(r.regional);
-      rg[t] += v; rg.total += v; rg.nLojas.add(r.loja);
-
-      // Mês (por tipo + total)
-      if (!meses.has(r.mes)) meses.set(r.mes, { mes: r.mes, N: 0, T: 0, I: 0, total: 0 });
-      var ms = meses.get(r.mes);
-      ms[t] += v; ms.total += v;
-
-      // Produtos agregados (sem loja)
-      if (r.natureza === 'F') {
-        if (!prodFalta.has(r.cod_produto)) {
-          prodFalta.set(r.cod_produto, { produto: r.produto, cod: r.cod_produto, depto: r.depto, valor: 0, qtde: 0 });
-        }
-        var pf = prodFalta.get(r.cod_produto);
-        pf.valor += v; pf.qtde += r.qtde;
-        if (!pf.depto) pf.depto = r.depto;
-      } else {
-        if (!prodSobra.has(r.cod_produto)) {
-          prodSobra.set(r.cod_produto, { produto: r.produto, cod: r.cod_produto, depto: r.depto, valor: 0, qtde: 0 });
-        }
-        var ps = prodSobra.get(r.cod_produto);
-        ps.valor += v; ps.qtde += r.qtde;
-        if (!ps.depto) ps.depto = r.depto;
-      }
+      renderKPIs(results[0] || {});
+      renderLojas(results[1] || []);
+      renderDeptos(results[2] || []);
+      renderRegionais(results[3] || []);
+      renderChart(results[4] || []);
+      renderTopFaltas(results[5] || []);
+      renderTopSobras(results[6] || []);
+    } catch (err) {
+      console.error(err);
+      alert('Erro ao carregar dados: ' + err.message);
+    } finally {
+      setLoading(false);
     }
-
-    return {
-      byTipo: byTipo,
-      lojas: Array.from(lojas.values()),
-      deptos: Array.from(deptos.values()),
-      regionais: Array.from(regionais.values()).map(function (r) {
-        return { regional: r.regional, N: r.N, T: r.T, I: r.I, total: r.total, nLojas: r.nLojas.size };
-      }),
-      meses: Array.from(meses.values()).sort(function (a, b) {
-        return MES_ORDER.indexOf(a.mes) - MES_ORDER.indexOf(b.mes);
-      }),
-      topFaltas: Array.from(prodFalta.values()).sort(function (a, b) { return a.valor - b.valor; }),
-      topSobras: Array.from(prodSobra.values()).sort(function (a, b) { return b.valor - a.valor; })
-    };
   }
 
-  function renderAll() {
-    var agg = aggregate();
-    renderKPIs(agg);
-    renderChart(agg);
-    renderLojas(agg);
-    renderDeptos(agg);
-    renderRegionais(agg);
-    renderTopFaltas(agg);
-    renderTopSobras(agg);
+  function renderKPIs(k) {
+    function set(id, v) {
+      var node = el(id);
+      if (!node) return;
+      node.textContent = fmtMoney(v);
+      node.className = node.className.replace(/text-(falta|sobra|slate-700|slate-800)/g, '').trim() + ' ' + moneyClass(v);
+    }
+    set('kpi-total', k.total);
+    set('kpi-normal', k.N);
+    set('kpi-top20', k.T);
+    set('kpi-inv', k.I);
   }
 
-  function renderKPIs(agg) {
-    var t = agg.byTipo;
-    el('kpi-total').textContent = fmtMoneyCompact(t.total);
-    el('kpi-total').className = 'mt-1 text-lg sm:text-xl font-bold tabular-nums whitespace-nowrap ' + moneyClass(t.total);
-    el('kpi-normal').textContent = fmtMoneyCompact(t.N);
-    el('kpi-normal').className = 'mt-1 text-lg sm:text-xl font-bold tabular-nums whitespace-nowrap ' + moneyClass(t.N);
-    el('kpi-top20').textContent = fmtMoneyCompact(t.T);
-    el('kpi-top20').className = 'mt-1 text-lg sm:text-xl font-bold tabular-nums whitespace-nowrap ' + moneyClass(t.T);
-    el('kpi-inv').textContent = fmtMoneyCompact(t.I);
-    el('kpi-inv').className = 'mt-1 text-lg sm:text-xl font-bold tabular-nums whitespace-nowrap ' + moneyClass(t.I);
+  function cellMoney(v) {
+    return '<td class="py-2 text-right text-xs font-semibold tabular-nums ' + moneyClass(v) + '">' + fmtMoney(v) + '</td>';
   }
 
-  function renderChart(agg) {
-    var labels = agg.meses.map(function (m) { return m.mes; });
+  function renderLojas(list) {
+    var sort = el('sort-lojas') ? el('sort-lojas').value : 'total_asc';
+    list = (list || []).slice();
+    if (sort === 'total_asc') list.sort(function (a, b) { return a.total - b.total; });
+    else if (sort === 'total_desc') list.sort(function (a, b) { return b.total - a.total; });
+    else list.sort(function (a, b) { return String(a.loja).localeCompare(String(b.loja)); });
+
+    var tbody = el('rank-lojas');
+    if (!tbody) return;
+    tbody.innerHTML = list.map(function (l) {
+      return '<tr class="border-t border-slate-50 hover:bg-slate-50 cursor-pointer" data-filter-loja="' + l.loja + '">' +
+        '<td class="py-2 pl-1 text-sm font-medium text-slate-800">' + l.loja + '</td>' +
+        cellMoney(l.N) + cellMoney(l.T) + cellMoney(l.I) +
+        '<td class="py-2 pr-1 text-right text-xs font-bold tabular-nums ' + moneyClass(l.total) + '">' + fmtMoney(l.total) + '</td></tr>';
+    }).join('') || '<tr><td colspan="5" class="py-4 text-sm text-slate-400 text-center">Nenhum dado</td></tr>';
+
+    tbody.querySelectorAll('[data-filter-loja]').forEach(function (row) {
+      row.addEventListener('click', function () {
+        filters.loja = row.dataset.filterLoja;
+        if (el('f-loja')) el('f-loja').value = filters.loja;
+        refreshAll();
+      });
+    });
+  }
+
+  function renderDeptos(list) {
+    list = (list || []).slice().sort(function (a, b) { return a.total - b.total; });
+    var tbody = el('rank-deptos');
+    if (!tbody) return;
+    tbody.innerHTML = list.map(function (d) {
+      return '<tr class="border-t border-slate-50 hover:bg-slate-50 cursor-pointer" data-filter-depto="' + d.depto + '">' +
+        '<td class="py-2 pl-1 text-sm font-medium text-slate-800">' + d.depto + '</td>' +
+        cellMoney(d.N) + cellMoney(d.T) + cellMoney(d.I) +
+        '<td class="py-2 pr-1 text-right text-xs font-bold tabular-nums ' + moneyClass(d.total) + '">' + fmtMoney(d.total) + '</td></tr>';
+    }).join('') || '<tr><td colspan="5" class="py-4 text-sm text-slate-400 text-center">Nenhum dado</td></tr>';
+
+    tbody.querySelectorAll('[data-filter-depto]').forEach(function (row) {
+      row.addEventListener('click', function () {
+        filters.depto = [row.dataset.filterDepto];
+        var deptoEl = el('f-depto');
+        if (deptoEl && deptoEl.multiple) {
+          Array.from(deptoEl.options).forEach(function (o) {
+            o.selected = o.value === row.dataset.filterDepto;
+          });
+        } else if (deptoEl) deptoEl.value = row.dataset.filterDepto;
+        refreshAll();
+      });
+    });
+  }
+
+  function renderRegionais(list) {
+    list = (list || []).slice().sort(function (a, b) { return a.total - b.total; });
+    var tbody = el('rank-regionais');
+    if (!tbody) return;
+    tbody.innerHTML = list.map(function (r) {
+      return '<tr class="border-t border-slate-50 hover:bg-slate-50 cursor-pointer" data-filter-reg="' + r.regional + '">' +
+        '<td class="py-2 pl-1 text-sm font-medium text-slate-800">' + r.regional +
+        ' <span class="text-[10px] text-slate-400 font-normal">(' + (r.nLojas || 0) + ' lojas)</span></td>' +
+        cellMoney(r.N) + cellMoney(r.T) + cellMoney(r.I) +
+        '<td class="py-2 pr-1 text-right text-xs font-bold tabular-nums ' + moneyClass(r.total) + '">' + fmtMoney(r.total) + '</td></tr>';
+    }).join('') || '<tr><td colspan="5" class="py-4 text-sm text-slate-400 text-center">Nenhum dado</td></tr>';
+
+    tbody.querySelectorAll('[data-filter-reg]').forEach(function (row) {
+      row.addEventListener('click', function () {
+        filters.regional = row.dataset.filterReg;
+        if (el('f-regional')) el('f-regional').value = filters.regional;
+        refreshAll();
+      });
+    });
+  }
+
+  function renderChart(meses) {
+    var order = MES_ORDER;
+    meses = (meses || []).slice().sort(function (a, b) {
+      return order.indexOf(a.mes) - order.indexOf(b.mes);
+    });
+    var labels = meses.map(function (m) { return m.mes; });
     var key = evolTipo === 'ALL' ? 'total' : evolTipo;
-    var data = agg.meses.map(function (m) { return m[key] || 0; });
+    var data = meses.map(function (m) { return Number(m[key]) || 0; });
     var label = evolTipo === 'ALL' ? 'Resultado Total' : (TIPO_LABEL[evolTipo] || evolTipo);
 
-    var ctx = el('chart-evolucao').getContext('2d');
+    var canvas = el('chart-evolucao');
+    if (!canvas) return;
+    var ctx = canvas.getContext('2d');
     if (chart) chart.destroy();
-    Chart.register(ChartDataLabels);
     chart = new Chart(ctx, {
       type: 'bar',
       data: {
@@ -429,27 +371,10 @@
         maintainAspectRatio: false,
         plugins: {
           legend: { display: false },
+          datalabels: { display: false },
           tooltip: {
             callbacks: {
-              label: function (ctx) { return label + ': ' + fmtMoneyCompact(ctx.parsed.y); }
-            }
-          },
-          datalabels: {
-            anchor: 'end',
-            align: function (context) {
-              return context.dataset.data[context.dataIndex] < 0 ? 'bottom' : 'top';
-            },
-            offset: 4,
-            color: '#374151',
-            font: {
-              size: 10,
-              weight: 'bold'
-            },
-            formatter: function (value) {
-              return fmtMoneyCompact(value);
-            },
-            display: function (context) {
-              return context.dataset.data[context.dataIndex] !== 0;
+              label: function (ctx) { return label + ': ' + fmtMoney(ctx.parsed.y); }
             }
           }
         },
@@ -468,264 +393,102 @@
     });
   }
 
-  function cellMoney(v) {
-    return '<td class="py-2 text-center text-xs font-semibold tabular-nums whitespace-nowrap ' + moneyClass(v) + '">' + fmtMoneyCompact(v) + '</td>';
-  }
-
-  function renderLojas(agg) {
-    var sort = el('sort-lojas').value;
-    var list = agg.lojas.slice();
-    if (sort === 'total_asc') list.sort(function (a, b) { return a.total - b.total; });
-    else if (sort === 'total_desc') list.sort(function (a, b) { return b.total - a.total; });
-    else list.sort(function (a, b) { return a.loja.localeCompare(b.loja); });
-
-    el('rank-lojas').innerHTML = list.map(function (l) {
-      return '<tr class="border-t border-slate-50 hover:bg-slate-50 cursor-pointer" data-filter-loja="' + l.loja + '">' +
-        '<td class="py-2 pl-1 text-sm font-medium text-slate-800 text-left whitespace-nowrap">' + l.loja + '</td>' +
-        cellMoney(l.N) + cellMoney(l.T) + cellMoney(l.I) +
-        '<td class="py-2 pr-1 text-center text-xs font-bold tabular-nums whitespace-nowrap ' + moneyClass(l.total) + '">' + fmtMoneyCompact(l.total) + '</td></tr>';
-    }).join('') || '<tr><td colspan="5" class="py-4 text-sm text-slate-400 text-center">Nenhum dado</td></tr>';
-
-    el('rank-lojas').querySelectorAll('[data-filter-loja]').forEach(function (row) {
-      row.addEventListener('click', function () {
-        filters.loja = row.dataset.filterLoja;
-        el('f-loja').value = filters.loja;
-        applyFilters();
-      });
-    });
-  }
-
-  function openExpandModal(title, tableHTML) {
-    el('modal-title').textContent = title;
-    el('modal-body').innerHTML = tableHTML;
-    el('modal').classList.remove('hidden');
-  }
-
-  function renderFullLojasTable(list) {
-    return '<div class="overflow-x-auto"><table class="w-full text-left">' +
-      '<thead><tr class="text-[10px] text-slate-400 uppercase border-b border-slate-200">' +
-      '<th class="pb-2 font-medium pl-1 text-left">Loja</th>' +
-      '<th class="pb-2 font-medium text-center">Normal</th>' +
-      '<th class="pb-2 font-medium text-center">TOP20</th>' +
-      '<th class="pb-2 font-medium text-center">Inv.</th>' +
-      '<th class="pb-2 font-medium text-center pr-1">Total</th></tr></thead>' +
-      '<tbody>' + list.map(function (l) {
-        return '<tr class="border-b border-slate-50 hover:bg-slate-50 cursor-pointer" data-filter-loja="' + l.loja + '">' +
-          '<td class="py-2 pl-1 text-sm font-medium text-slate-800 text-left whitespace-nowrap">' + l.loja + '</td>' +
-          cellMoney(l.N) + cellMoney(l.T) + cellMoney(l.I) +
-          '<td class="py-2 pr-1 text-center text-xs font-bold tabular-nums whitespace-nowrap ' + moneyClass(l.total) + '">' + fmtMoneyCompact(l.total) + '</td></tr>';
-      }).join('') + '</tbody></table></div>';
-  }
-
-  function renderFullDeptosTable(list) {
-    return '<div class="overflow-x-auto"><table class="w-full text-left">' +
-      '<thead><tr class="text-[10px] text-slate-400 uppercase border-b border-slate-200">' +
-      '<th class="pb-2 font-medium pl-1 text-left">Depto</th>' +
-      '<th class="pb-2 font-medium text-center">Normal</th>' +
-      '<th class="pb-2 font-medium text-center">TOP20</th>' +
-      '<th class="pb-2 font-medium text-center">Inv.</th>' +
-      '<th class="pb-2 font-medium text-center pr-1">Total</th></tr></thead>' +
-      '<tbody>' + list.map(function (d) {
-        return '<tr class="border-b border-slate-50 hover:bg-slate-50 cursor-pointer" data-filter-depto="' + d.depto + '">' +
-          '<td class="py-2 pl-1 text-sm font-medium text-slate-800 text-left whitespace-nowrap">' + d.depto + '</td>' +
-          cellMoney(d.N) + cellMoney(d.T) + cellMoney(d.I) +
-          '<td class="py-2 pr-1 text-center text-xs font-bold tabular-nums whitespace-nowrap ' + moneyClass(d.total) + '">' + fmtMoneyCompact(d.total) + '</td></tr>';
-      }).join('') + '</tbody></table></div>';
-  }
-
-  function renderDeptos(agg) {
-    var sort = el('sort-deptos').value;
-    var list = agg.deptos.slice();
-    if (sort === 'total_asc') list.sort(function (a, b) { return a.total - b.total; });
-    else if (sort === 'total_desc') list.sort(function (a, b) { return b.total - a.total; });
-    else list.sort(function (a, b) { return a.depto.localeCompare(b.depto); });
-
-    el('rank-deptos').innerHTML = list.map(function (d) {
-      return '<tr class="border-t border-slate-50 hover:bg-slate-50 cursor-pointer" data-filter-depto="' + d.depto + '">' +
-        '<td class="py-2 pl-1 text-sm font-medium text-slate-800 text-left whitespace-nowrap">' + d.depto + '</td>' +
-        cellMoney(d.N) + cellMoney(d.T) + cellMoney(d.I) +
-        '<td class="py-2 pr-1 text-center text-xs font-bold tabular-nums whitespace-nowrap ' + moneyClass(d.total) + '">' + fmtMoneyCompact(d.total) + '</td></tr>';
-    }).join('') || '<tr><td colspan="5" class="py-4 text-sm text-slate-400 text-center">Nenhum dado</td></tr>';
-
-    el('rank-deptos').querySelectorAll('[data-filter-depto]').forEach(function (row) {
-      row.addEventListener('click', function () {
-        filters.depto = [row.dataset.filterDepto];
-        // Marcar apenas o checkbox correspondente
-        document.querySelectorAll('.depto-checkbox').forEach(function (cb) {
-          cb.checked = (cb.value === row.dataset.filterDepto);
-        });
-        applyFilters();
-      });
-    });
-  }
-
-  function renderRegionais(agg) {
-    var sort = el('sort-regionais').value;
-    var list = agg.regionais.slice();
-    if (sort === 'total_asc') list.sort(function (a, b) { return a.total - b.total; });
-    else if (sort === 'total_desc') list.sort(function (a, b) { return b.total - a.total; });
-    else list.sort(function (a, b) { return a.regional.localeCompare(b.regional); });
-
-    el('rank-regionais').innerHTML = list.map(function (r) {
-      return '<tr class="border-t border-slate-50 hover:bg-slate-50 cursor-pointer" data-filter-reg="' + r.regional + '">' +
-        '<td class="py-2 pl-1 text-sm font-medium text-slate-800 text-left whitespace-nowrap">' + r.regional +
-        ' <span class="text-[10px] text-slate-400 font-normal">(' + r.nLojas + ' lojas)</span></td>' +
-        cellMoney(r.N) + cellMoney(r.T) + cellMoney(r.I) +
-        '<td class="py-2 pr-1 text-center text-xs font-bold tabular-nums whitespace-nowrap ' + moneyClass(r.total) + '">' + fmtMoneyCompact(r.total) + '</td></tr>';
-    }).join('') || '<tr><td colspan="5" class="py-4 text-sm text-slate-400 text-center">Nenhum dado</td></tr>';
-
-    el('rank-regionais').querySelectorAll('[data-filter-reg]').forEach(function (row) {
-      row.addEventListener('click', function () {
-        filters.regional = row.dataset.filterReg;
-        el('f-regional').value = filters.regional;
-        applyFilters();
-      });
-    });
-  }
-
-  function renderTopFaltas(agg) {
-    var n = parseInt(el('top-n-faltas').value, 10);
-    var list = agg.topFaltas.slice(0, n);
-    el('rank-faltas').innerHTML = list.map(function (p, i) {
+  function renderTopFaltas(list) {
+    var box = el('rank-faltas');
+    if (!box) return;
+    box.innerHTML = (list || []).map(function (p, i) {
       return '<button class="w-full text-left px-4 py-3 hover:bg-red-50/40 transition" data-prod="' + p.cod + '">' +
         '<div class="flex items-start gap-3">' +
         '<span class="text-xs font-bold text-red-300 w-5 shrink-0 mt-0.5">' + (i + 1) + '</span>' +
         '<div class="flex-1 min-w-0"><p class="text-sm font-medium text-slate-800 line-clamp-2">' + p.produto + '</p>' +
         '<p class="text-[11px] text-slate-400 mt-0.5">' + (p.depto || '') + ' · Cód ' + p.cod + '</p></div>' +
-        '<div class="text-right shrink-0"><p class="text-sm font-bold text-falta tabular-nums whitespace-nowrap">' + fmtMoneyCompact(p.valor) + '</p>' +
+        '<div class="text-right shrink-0"><p class="text-sm font-bold text-falta tabular-nums">' + fmtMoney(p.valor) + '</p>' +
         '<p class="text-[10px] text-slate-400">' + fmt(p.qtde, 2) + ' un</p></div></div></button>';
     }).join('') || '<p class="p-4 text-sm text-slate-400">Nenhuma falta no filtro</p>';
 
-    el('rank-faltas').querySelectorAll('[data-prod]').forEach(function (btn) {
+    box.querySelectorAll('[data-prod]').forEach(function (btn) {
       btn.addEventListener('click', function () { openProductModal(btn.dataset.prod); });
     });
   }
 
-  function renderTopSobras(agg) {
-    var n = parseInt(el('top-n-sobras').value, 10);
-    var list = agg.topSobras.slice(0, n);
-    el('rank-sobras').innerHTML = list.map(function (p, i) {
+  function renderTopSobras(list) {
+    var box = el('rank-sobras');
+    if (!box) return;
+    box.innerHTML = (list || []).map(function (p, i) {
       return '<button class="w-full text-left px-4 py-3 hover:bg-emerald-50/40 transition" data-prod="' + p.cod + '">' +
         '<div class="flex items-start gap-3">' +
         '<span class="text-xs font-bold text-emerald-300 w-5 shrink-0 mt-0.5">' + (i + 1) + '</span>' +
         '<div class="flex-1 min-w-0"><p class="text-sm font-medium text-slate-800 line-clamp-2">' + p.produto + '</p>' +
         '<p class="text-[11px] text-slate-400 mt-0.5">' + (p.depto || '') + ' · Cód ' + p.cod + '</p></div>' +
-        '<div class="text-right shrink-0"><p class="text-sm font-bold text-sobra tabular-nums whitespace-nowrap">' + fmtMoneyCompact(p.valor) + '</p>' +
+        '<div class="text-right shrink-0"><p class="text-sm font-bold text-sobra tabular-nums">' + fmtMoney(p.valor) + '</p>' +
         '<p class="text-[10px] text-slate-400">' + fmt(p.qtde, 2) + ' un</p></div></div></button>';
     }).join('') || '<p class="p-4 text-sm text-slate-400">Nenhuma sobra no filtro</p>';
 
-    el('rank-sobras').querySelectorAll('[data-prod]').forEach(function (btn) {
+    box.querySelectorAll('[data-prod]').forEach(function (btn) {
       btn.addEventListener('click', function () { openProductModal(btn.dataset.prod); });
     });
   }
 
-  function openProductModal(cod) {
-    var items = filtered.filter(function (r) { return r.cod_produto === cod; });
-    if (!items.length) return;
-    var first = items[0];
-    var sobras = 0, faltas = 0, qS = 0, qF = 0;
-    var tipos = new Set();
-    var byLoja = new Map();
-    items.forEach(function (r) {
-      if (r.natureza === 'S') { sobras += r.valor; qS += r.qtde; }
-      else { faltas += r.valor; qF += r.qtde; }
-      tipos.add(TIPO_LABEL[r.tipo] || r.tipo);
-      if (!byLoja.has(r.loja)) byLoja.set(r.loja, 0);
-      byLoja.set(r.loja, byLoja.get(r.loja) + r.valor);
-    });
-    var resultado = sobras + faltas;
+  async function openProductModal(cod) {
+    setLoading(true);
+    try {
+      var p = filterParams();
+      var det = await rpc('api_produto_detalhe', Object.assign({}, p, { p_codigo: cod }));
+      if (!det || !det.codigo) {
+        alert('Produto não encontrado no filtro atual');
+        return;
+      }
+      var lojaRows = (det.por_loja || []).map(function (e) {
+        return '<tr class="border-t border-slate-50"><td class="py-1.5 text-xs">' + e.loja + '</td>' +
+          '<td class="py-1.5 text-right text-xs font-medium tabular-nums ' + moneyClass(e.resultado) + '">' + fmtMoney(e.resultado) + '</td></tr>';
+      }).join('');
 
-    var lojaRows = Array.from(byLoja.entries()).sort(function (a, b) { return a[1] - b[1]; }).map(function (e) {
-      return '<tr class="border-t border-slate-50"><td class="py-1.5 text-xs">' + e[0] + '</td>' +
-        '<td class="py-1.5 text-right text-xs font-medium tabular-nums whitespace-nowrap ' + moneyClass(e[1]) + '">' + fmtMoneyCompact(e[1]) + '</td></tr>';
-    }).join('');
+      var hist = (det.historico || []).map(function (h) {
+        return '<tr class="border-t border-slate-50">' +
+          '<td class="py-1.5 pr-2 text-xs text-slate-500 whitespace-nowrap">' + h.data + '</td>' +
+          '<td class="py-1.5 pr-2 text-xs">' + h.loja + '</td>' +
+          '<td class="py-1.5 pr-2 text-xs">' + (TIPO_LABEL[h.tipo] || h.tipo) + '</td>' +
+          '<td class="py-1.5 text-right text-xs font-medium tabular-nums ' + moneyClass(h.valor) + '">' + fmtMoney(h.valor) + '</td></tr>';
+      }).join('');
 
-    el('modal-body').innerHTML =
-      '<p class="text-base font-semibold text-slate-900 leading-snug">' + first.produto + '</p>' +
-      '<p class="text-xs text-slate-400 mt-1">Cód ' + first.cod_produto + ' · ' + first.depto + '</p>' +
-      '<div class="grid grid-cols-3 gap-2 mt-4">' +
-      '<div class="rounded-xl bg-emerald-50 p-3 text-center"><p class="text-[10px] text-emerald-600 font-medium uppercase">Sobras</p><p class="text-sm font-bold text-sobra mt-0.5">' + fmtMoneyCompact(sobras) + '</p></div>' +
-      '<div class="rounded-xl bg-red-50 p-3 text-center"><p class="text-[10px] text-red-600 font-medium uppercase">Faltas</p><p class="text-sm font-bold text-falta mt-0.5">' + fmtMoneyCompact(faltas) + '</p></div>' +
-      '<div class="rounded-xl bg-slate-50 p-3 text-center"><p class="text-[10px] text-slate-500 font-medium uppercase">Resultado</p><p class="text-sm font-bold mt-0.5 ' + moneyClass(resultado) + '">' + fmtMoneyCompact(resultado) + '</p></div>' +
-      '</div>' +
-      '<p class="text-xs text-slate-500 mt-3"><span class="font-medium">Tipos:</span> ' + Array.from(tipos).join(', ') + ' · ' + items.length + ' lanç.</p>' +
-      '<h4 class="text-xs font-semibold text-slate-600 mt-4 mb-2 uppercase tracking-wide">Por loja</h4>' +
-      '<table class="w-full"><thead><tr class="text-[10px] text-slate-400 uppercase"><th class="pb-1 font-medium text-left">Loja</th><th class="pb-1 font-medium text-right">Resultado</th></tr></thead><tbody>' + lojaRows + '</tbody></table>';
-    el('modal').classList.remove('hidden');
+      el('modal-body').innerHTML =
+        '<p class="text-base font-semibold text-slate-900 leading-snug">' + det.produto + '</p>' +
+        '<p class="text-xs text-slate-400 mt-1">Cód ' + det.codigo + ' · ' + (det.depto || '') + '</p>' +
+        '<div class="grid grid-cols-3 gap-2 mt-4">' +
+        '<div class="rounded-xl bg-emerald-50 p-3 text-center"><p class="text-[10px] text-emerald-600 font-medium uppercase">Sobras</p><p class="text-sm font-bold text-sobra mt-0.5">' + fmtMoney(det.sobras) + '</p></div>' +
+        '<div class="rounded-xl bg-red-50 p-3 text-center"><p class="text-[10px] text-red-600 font-medium uppercase">Faltas</p><p class="text-sm font-bold text-falta mt-0.5">' + fmtMoney(det.faltas) + '</p></div>' +
+        '<div class="rounded-xl bg-slate-50 p-3 text-center"><p class="text-[10px] text-slate-500 font-medium uppercase">Resultado</p><p class="text-sm font-bold mt-0.5 ' + moneyClass(det.resultado) + '">' + fmtMoney(det.resultado) + '</p></div>' +
+        '</div>' +
+        '<p class="text-xs text-slate-500 mt-3">' + (det.lancamentos || 0) + ' lançamentos no filtro</p>' +
+        '<h4 class="text-xs font-semibold text-slate-600 mt-4 mb-2 uppercase tracking-wide">Por loja</h4>' +
+        '<table class="w-full"><thead><tr class="text-[10px] text-slate-400 uppercase"><th class="pb-1 font-medium text-left">Loja</th><th class="pb-1 font-medium text-right">Resultado</th></tr></thead><tbody>' + lojaRows + '</tbody></table>' +
+        '<h4 class="text-xs font-semibold text-slate-600 mt-4 mb-2 uppercase tracking-wide">Histórico</h4>' +
+        '<table class="w-full"><thead><tr class="text-[10px] text-slate-400 uppercase"><th class="pb-1 font-medium text-left">Data</th><th class="pb-1 font-medium">Loja</th><th class="pb-1 font-medium">Tipo</th><th class="pb-1 font-medium text-right">Valor</th></tr></thead><tbody>' + hist + '</tbody></table>';
+      el('modal').classList.remove('hidden');
+    } catch (err) {
+      alert('Erro: ' + err.message);
+    } finally {
+      setLoading(false);
+    }
   }
 
   function closeModal() { el('modal').classList.add('hidden'); }
 
-  function exportCSV() {
-    var headers = ['Regional','Loja','Mês','Data','Depto','Cod Produto','Produto','Cod Dcto','Tipo','Natureza','Valor','Qtde'];
-    var rows = filtered.map(function (r) {
-      return [r.regional, r.loja, r.mes, r.data, r.depto, r.cod_produto, '"' + (r.produto || '').replace(/"/g, '""') + '"',
-        r.cod_dcto, TIPO_LABEL[r.tipo] || r.tipo, r.natureza === 'S' ? 'Sobra' : 'Falta', r.valor, r.qtde].join(';');
-    });
-    var blob = new Blob(['\uFEFF' + headers.join(';') + '\n' + rows.join('\n')], { type: 'text/csv;charset=utf-8' });
-    var a = document.createElement('a');
-    a.href = URL.createObjectURL(blob);
-    a.download = 'inventarios_filtrado_' + new Date().toISOString().slice(0, 10) + '.csv';
-    a.click();
-  }
-
   // Events
-  el('btn-filters').addEventListener('click', openDrawer);
-  el('btn-close-drawer').addEventListener('click', closeDrawer);
-  el('drawer-overlay').addEventListener('click', closeDrawer);
-  el('btn-apply').addEventListener('click', function () { readFiltersFromUI(); applyFilters(); closeDrawer(); });
-  el('btn-clear').addEventListener('click', clearFilters);
-  el('btn-export').addEventListener('click', exportCSV);
-  el('sort-lojas').addEventListener('change', function () { renderLojas(aggregate()); });
-  el('sort-deptos').addEventListener('change', function () { renderDeptos(aggregate()); });
-  el('sort-regionais').addEventListener('change', function () { renderRegionais(aggregate()); });
-  el('top-n-faltas').addEventListener('change', function () { renderTopFaltas(aggregate()); });
-  el('top-n-sobras').addEventListener('change', function () { renderTopSobras(aggregate()); });
-  el('modal-close').addEventListener('click', closeModal);
-  el('modal-overlay').addEventListener('click', closeModal);
-
-  // Botões expandir
-  el('btn-expand-lojas').addEventListener('click', function () {
-    var agg = aggregate();
-    var sort = el('sort-lojas').value;
-    var list = agg.lojas.slice();
-    if (sort === 'total_asc') list.sort(function (a, b) { return a.total - b.total; });
-    else if (sort === 'total_desc') list.sort(function (a, b) { return b.total - a.total; });
-    else list.sort(function (a, b) { return a.loja.localeCompare(b.loja); });
-    openExpandModal('Todas as Lojas', renderFullLojasTable(list));
-    
-    // Adicionar listeners para as linhas no modal
-    el('modal-body').querySelectorAll('[data-filter-loja]').forEach(function (row) {
-      row.addEventListener('click', function () {
-        filters.loja = row.dataset.filterLoja;
-        el('f-loja').value = filters.loja;
-        closeModal();
-        applyFilters();
-      });
-    });
+  if (el('btn-filters')) el('btn-filters').addEventListener('click', openDrawer);
+  if (el('btn-close-drawer')) el('btn-close-drawer').addEventListener('click', closeDrawer);
+  if (el('drawer-overlay')) el('drawer-overlay').addEventListener('click', closeDrawer);
+  if (el('btn-apply')) el('btn-apply').addEventListener('click', function () {
+    readFiltersFromUI();
+    refreshAll();
+    closeDrawer();
   });
-
-  el('btn-expand-deptos').addEventListener('click', function () {
-    var agg = aggregate();
-    var sort = el('sort-deptos').value;
-    var list = agg.deptos.slice();
-    if (sort === 'total_asc') list.sort(function (a, b) { return a.total - b.total; });
-    else if (sort === 'total_desc') list.sort(function (a, b) { return b.total - a.total; });
-    else list.sort(function (a, b) { return a.depto.localeCompare(b.depto); });
-    openExpandModal('Todos os Departamentos', renderFullDeptosTable(list));
-    
-    // Adicionar listeners para as linhas no modal
-    el('modal-body').querySelectorAll('[data-filter-depto]').forEach(function (row) {
-      row.addEventListener('click', function () {
-        filters.depto = [row.dataset.filterDepto];
-        document.querySelectorAll('.depto-checkbox').forEach(function (cb) {
-          cb.checked = (cb.value === row.dataset.filterDepto);
-        });
-        closeModal();
-        applyFilters();
-      });
-    });
-  });
+  if (el('btn-clear')) el('btn-clear').addEventListener('click', clearFilters);
+  if (el('sort-lojas')) el('sort-lojas').addEventListener('change', function () { refreshAll(); });
+  if (el('top-n-faltas')) el('top-n-faltas').addEventListener('change', function () { refreshAll(); });
+  if (el('top-n-sobras')) el('top-n-sobras').addEventListener('change', function () { refreshAll(); });
+  if (el('modal-close')) el('modal-close').addEventListener('click', closeModal);
+  if (el('modal-overlay')) el('modal-overlay').addEventListener('click', closeModal);
 
   document.querySelectorAll('.evol-btn').forEach(function (btn) {
     btn.addEventListener('click', function () {
@@ -735,9 +498,10 @@
         b.classList.toggle('bg-slate-100', b !== btn);
         b.classList.toggle('text-slate-600', b !== btn);
       });
-      renderChart(aggregate());
+      // re-fetch only evolution would be ideal; full refresh is fine for now
+      refreshAll();
     });
   });
 
-  loadData();
+  init();
 })();

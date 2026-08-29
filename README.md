@@ -1,38 +1,128 @@
-# Painel de Inventários e Ajustes de Estoque
+# Painel Inventários — Supabase + Importação Web
 
-## Arquivos para o GitHub Pages (raiz do repositório)
+## Arquitetura
 
 ```
-index.html    → Painel principal
-app.js        → Lógica
-data.js       → Base de dados
-admin.html    → Atualização da base (protegido por senha)
+admin.html  →  parseia Excel no browser (arquivos 100MB+)
+            →  envia lotes de ~400 linhas
+            →  Edge Functions gravam no Postgres
+            →  relatório de auditoria vs BI
+
+index.html  →  só consome RPCs agregadas (leve)
 ```
 
-## GitHub Pages
+**Não** hospede `data.js` / `data.js.gz` no GitHub.
 
-1. Settings → Pages
-2. Branch: main · Folder: / (root)
-3. URL: `https://SEU-USUARIO.github.io/NOME-DO-REPO/`
+---
 
-## Atualizar a base
+## 1. Schema
 
-Acesse: `https://SEU-USUARIO.github.io/NOME-DO-REPO/admin.html`
+No SQL Editor do Supabase, rode o arquivo `schema.sql` completo.
 
-- Senha padrão: `admin2026` (altere em `admin.html`, variável `ADMIN_PASSWORD`)
-- Envie o Excel → processa no navegador → salva no IndexedDB
-- O painel usa a base atualizada **neste navegador**
-- Para publicar para todos: clique em **Baixar data.js** e substitua no repositório GitHub
+---
 
-## Regras de negócio
+## 2. Auth do admin (Supabase Auth)
 
-| Cod Dcto | Tipo | Natureza | Sinal na tela |
-|----------|------|----------|---------------|
-| 6416 | Ajuste Normal | Sobra | + |
-| 6417 | Ajuste Normal | Falta | − |
-| 5200 | Ajuste TOP20 | Sobra | + |
-| 5600 | Ajuste TOP20 | Falta | − |
-| 5201 | Inventário Departamental | Sobra | + |
-| 5601 | Inventário Departamental | Falta | − |
+1. No Supabase: **Authentication → Users → Add user**
+   - E-mail + senha do administrador
+2. (Recomendado) No usuário → **App Metadata**:
+   ```json
+   { "role": "admin" }
+   ```
+   Se **nenhum** usuário tiver `role`, qualquer autenticado pode importar (útil no setup inicial).  
+   Quando existir `role` em algum user, só quem tiver `"admin"` importa.
 
-Resultado = soma dos valores com sinal (sobras positivas + faltas negativas).
+3. Em **Authentication → Providers**, deixe **Email** habilitado.
+
+4. Secrets das functions (CLI injeta automaticamente no deploy):
+   - `SUPABASE_URL`
+   - `SUPABASE_ANON_KEY`
+   - `SUPABASE_SERVICE_ROLE_KEY`
+
+Não use mais `IMPORT_SECRET`.
+
+---
+
+## 3. Deploy das functions
+
+```bash
+# Na pasta do projeto (com supabase CLI logado)
+supabase functions deploy import-start
+supabase functions deploy import-chunk
+supabase functions deploy import-finish
+```
+
+Arquivos em:
+
+```
+supabase/functions/import-start/index.ts
+supabase/functions/import-chunk/index.ts
+supabase/functions/import-finish/index.ts
+```
+
+---
+
+## 4. Front (`config.js`)
+
+```js
+window.SUPABASE_URL = 'https://xxxx.supabase.co';
+window.SUPABASE_ANON_KEY = 'eyJhbG...';
+```
+
+Publique: `index.html`, `app.js`, `config.js`, `admin.html`
+
+---
+
+## 5. Importar a base real (100MB+)
+
+1. Abra `admin.html`
+2. Faça login com e-mail/senha do Supabase Auth
+3. Selecione o Excel
+4. Marque **Substituir base inteira** na primeira carga
+5. Confira/ajuste o checkpoint BI (padrão Ourinhos/ago/Açougue)
+6. **Processar e importar**
+
+O browser lê o arquivo localmente (nada de 100MB passando pela Edge Function de uma vez).  
+Depois envia lotes de 400 linhas.
+
+No final o relatório mostra:
+
+| Check | Esperado (BI) | Obtido |
+|-------|---------------|--------|
+| 5201 soma abs | 11.240 | … |
+| 5601 soma abs | 19.353 | … |
+| Resultado inventário | −8.113 | … |
+
+✅ **APROVADO** só se bater (tolerância R$ 1,00).
+
+---
+
+## Regra de valor
+
+```
+valor_original     = valor da planilha (inalterado)
+natureza           = Cod Dcto (5201=Sobra, 5601=Falta, …)
+valor_apresentacao = +ABS(original) se Sobra
+                   = -ABS(original) se Falta
+resultado          = SUM(valor_apresentacao)
+```
+
+---
+
+## Requisitos do PC do admin
+
+- Planilha 100MB+ precisa de **memória RAM** no browser (ideal 8GB+ livres)
+- Chrome/Edge recomendados
+- Não feche a aba durante o processo (pode levar 10–40 min conforme máquina e rede)
+
+---
+
+## Troubleshooting
+
+| Problema | Solução |
+|----------|---------|
+| 401 Unauthorized | Sessão expirada ou usuário inválido — faça login de novo |
+| 403 Sem permissão | App Metadata sem `role: admin` |
+| Timeout no lote | Reduza `CHUNK` em admin.html (ex.: 200) |
+| Checkpoint reprovado | Conferir se a planilha é a mesma do BI; ver Σ original por Cod Dcto no relatório |
+| CORS | Redeploy das functions após ajustar headers |

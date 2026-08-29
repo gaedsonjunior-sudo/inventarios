@@ -3,339 +3,437 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Admin — Atualizar Base</title>
+  <title>Admin — Importar Base</title>
   <script src="https://cdn.tailwindcss.com"></script>
-  <script src="https://cdn.sheetjs.com/xlsx-0.20.1/package/dist/xlsx.full.min.js"></script>
+  <script src="https://cdn.sheetjs.com/xlsx-0.20.3/package/dist/xlsx.full.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+  <script src="config.js"></script>
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet" />
   <style>
     body { font-family: Inter, system-ui, sans-serif; }
-    .spinner { border: 3px solid #e2e8f0; border-top-color: #0ea5e9; border-radius: 50%; width: 28px; height: 28px; animation: spin .8s linear infinite; display: inline-block; }
-    @keyframes spin { to { transform: rotate(360deg); } }
+    .bar { transition: width .2s ease; }
   </style>
 </head>
 <body class="bg-slate-100 min-h-screen">
 
-  <!-- Login -->
-  <div id="login-screen" class="min-h-screen flex items-center justify-center p-4">
+  <div id="login" class="min-h-screen flex items-center justify-center p-4">
     <div class="bg-white rounded-2xl shadow-lg border border-slate-200 p-6 w-full max-w-sm">
       <h1 class="text-lg font-bold text-slate-900">Área administrativa</h1>
-      <p class="text-sm text-slate-500 mt-1">Atualização da base de inventários</p>
-      <label class="block text-xs font-medium text-slate-500 uppercase mt-5">Senha</label>
-      <input type="password" id="pwd" class="mt-1 w-full border border-slate-200 rounded-xl px-3 py-2.5 text-sm" placeholder="Digite a senha" />
-      <p id="pwd-err" class="text-xs text-red-500 mt-1 hidden">Senha incorreta</p>
+      <p class="text-sm text-slate-500 mt-1">Login via Supabase Auth</p>
+
+      <label class="block text-xs font-medium text-slate-500 uppercase mt-5">E-mail</label>
+      <input type="email" id="email" autocomplete="username" class="mt-1 w-full border border-slate-200 rounded-xl px-3 py-2.5 text-sm" placeholder="admin@empresa.com" />
+
+      <label class="block text-xs font-medium text-slate-500 uppercase mt-3">Senha</label>
+      <input type="password" id="password" autocomplete="current-password" class="mt-1 w-full border border-slate-200 rounded-xl px-3 py-2.5 text-sm" placeholder="••••••••" />
+
+      <p id="login-err" class="text-xs text-red-500 mt-2 hidden"></p>
+
       <button id="btn-login" class="mt-4 w-full py-2.5 text-sm font-semibold rounded-xl bg-sky-600 text-white hover:bg-sky-700">Entrar</button>
-      <p class="text-[11px] text-slate-400 mt-4 text-center">Senha padrão: <code class="bg-slate-100 px-1 rounded">admin2026</code> — altere em admin.html</p>
+      <a href="index.html" class="block text-center text-xs text-sky-600 mt-4">← Voltar ao painel</a>
+      <p class="text-[11px] text-slate-400 mt-4 text-center leading-relaxed">
+        Crie o usuário em Supabase → Authentication → Users.<br />
+        Opcional: App Metadata <code class="bg-slate-100 px-1 rounded">{"role":"admin"}</code>
+      </p>
     </div>
   </div>
 
-  <!-- Admin panel -->
-  <div id="admin-screen" class="hidden max-w-2xl mx-auto px-4 py-8">
-    <div class="flex items-center justify-between mb-6">
+  <div id="panel" class="hidden max-w-3xl mx-auto px-4 py-8 space-y-5">
+    <div class="flex items-center justify-between gap-3 flex-wrap">
       <div>
-        <h1 class="text-xl font-bold text-slate-900">Atualizar Base</h1>
-        <p class="text-sm text-slate-500">Envie a planilha Excel com os lançamentos</p>
+        <h1 class="text-xl font-bold text-slate-900">Importar planilha</h1>
+        <p class="text-sm text-slate-500">Logado como <span id="user-email" class="font-medium text-slate-700"></span></p>
       </div>
-      <a href="index.html" class="text-sm text-sky-600 hover:underline">← Voltar ao painel</a>
+      <div class="flex items-center gap-3">
+        <a href="index.html" class="text-sm text-sky-600 hover:underline">Painel</a>
+        <button id="btn-logout" class="text-sm text-slate-500 hover:text-slate-800">Sair</button>
+      </div>
     </div>
 
-    <div class="bg-white rounded-2xl border border-slate-200 shadow-sm p-6 space-y-5">
+    <div class="bg-white rounded-2xl border border-slate-200 shadow-sm p-5 space-y-4">
       <div>
         <label class="text-xs font-medium text-slate-500 uppercase">Arquivo Excel (.xlsx)</label>
-        <input type="file" id="file-input" accept=".xlsx,.xls,.csv" class="mt-2 block w-full text-sm text-slate-600 file:mr-4 file:py-2 file:px-4 file:rounded-xl file:border-0 file:text-sm file:font-semibold file:bg-sky-50 file:text-sky-700 hover:file:bg-sky-100" />
+        <input type="file" id="file" accept=".xlsx,.xls" class="mt-2 block w-full text-sm" />
       </div>
 
-      <div class="bg-slate-50 rounded-xl p-4 text-xs text-slate-600 space-y-1">
-        <p class="font-semibold text-slate-700">Colunas esperadas:</p>
-        <p>Regional, Loja, Mês, Data, Cod Depto, Depto, Cod Produto, Produto, Cod Dcto, Especie, Real Perda Total Qtde, Real Perda Total R$</p>
+      <label class="flex items-center gap-2 text-sm text-slate-700">
+        <input type="checkbox" id="replace" class="rounded border-slate-300" />
+        Substituir base inteira (apaga lançamentos antes de importar)
+      </label>
+
+      <div class="bg-slate-50 rounded-xl p-3 text-xs text-slate-600">
+        <p class="font-semibold text-slate-700 mb-1">Colunas esperadas</p>
+        Regional, Loja, Mês, Data, Cod Depto, Depto, Cod Produto, Produto, Cod Dcto, Especie, Real Perda Total Qtde, Real Perda Total R$
       </div>
 
-      <button id="btn-process" disabled class="w-full py-3 text-sm font-semibold rounded-xl bg-sky-600 text-white hover:bg-sky-700 disabled:opacity-40 disabled:cursor-not-allowed flex items-center justify-center gap-2">
-        <span id="btn-label">Processar e atualizar</span>
-        <span id="btn-spin" class="spinner hidden"></span>
+      <div class="bg-amber-50 border border-amber-200 rounded-xl p-3 text-xs text-amber-900">
+        <p class="font-semibold">Checkpoint de auditoria (BI)</p>
+        <p class="mt-1">Ourinhos · ago · Açougue · Inventário</p>
+        <div class="grid grid-cols-3 gap-2 mt-2">
+          <div>
+            <label class="text-[10px] uppercase text-amber-700">5201 abs</label>
+            <input id="exp-5201" type="number" value="11240" class="w-full border border-amber-200 rounded-lg px-2 py-1 text-sm" />
+          </div>
+          <div>
+            <label class="text-[10px] uppercase text-amber-700">5601 abs</label>
+            <input id="exp-5601" type="number" value="19353" class="w-full border border-amber-200 rounded-lg px-2 py-1 text-sm" />
+          </div>
+          <div>
+            <label class="text-[10px] uppercase text-amber-700">Resultado inv.</label>
+            <input id="exp-res" type="number" value="-8113" class="w-full border border-amber-200 rounded-lg px-2 py-1 text-sm" />
+          </div>
+        </div>
+      </div>
+
+      <button id="btn-run" disabled class="w-full py-3 text-sm font-semibold rounded-xl bg-sky-600 text-white hover:bg-sky-700 disabled:opacity-40">
+        Processar e importar
       </button>
 
-      <div id="result" class="hidden rounded-xl border p-4 text-sm"></div>
+      <div id="progress-wrap" class="hidden space-y-2">
+        <div class="flex justify-between text-xs text-slate-500">
+          <span id="prog-label">Aguardando…</span>
+          <span id="prog-pct">0%</span>
+        </div>
+        <div class="h-2 bg-slate-100 rounded-full overflow-hidden">
+          <div id="prog-bar" class="bar h-full bg-sky-500 rounded-full" style="width:0%"></div>
+        </div>
+        <p id="prog-detail" class="text-[11px] text-slate-400"></p>
+      </div>
     </div>
 
-    <div class="mt-6 bg-amber-50 border border-amber-200 rounded-2xl p-4 text-sm text-amber-800">
-      <p class="font-semibold">Como funciona a atualização</p>
-      <ul class="mt-2 space-y-1 text-xs list-disc list-inside">
-        <li>A base é processada no navegador e salva localmente (IndexedDB).</li>
-        <li>O painel principal passa a usar essa base atualizada <strong>neste navegador</strong>.</li>
-        <li>Para publicar para todos os usuários no GitHub Pages, baixe o <code>data.js</code> gerado e substitua no repositório.</li>
-      </ul>
-      <button id="btn-download-js" class="mt-3 hidden px-3 py-1.5 text-xs font-semibold rounded-lg bg-amber-600 text-white hover:bg-amber-700">Baixar data.js para o GitHub</button>
-    </div>
+    <div id="report" class="hidden bg-white rounded-2xl border border-slate-200 shadow-sm p-5 space-y-4"></div>
   </div>
 
-  <script>
-  (function () {
-    // ── ALTERE A SENHA AQUI ──
-    var ADMIN_PASSWORD = 'admin2026';
+<script>
+(function () {
+  var CHUNK = 400;
+  var sb = null;
+  var accessToken = null;
 
-    var DOCUMENTOS = {
-      '6416': { t: 'N', n: 'S' },
-      '6417': { t: 'N', n: 'F' },
-      '5200': { t: 'T', n: 'S' },
-      '5600': { t: 'T', n: 'F' },
-      '5201': { t: 'I', n: 'S' },
-      '5601': { t: 'I', n: 'F' }
+  function $(id) { return document.getElementById(id); }
+
+  function ensureConfig() {
+    if (!window.SUPABASE_URL || window.SUPABASE_URL.indexOf('SEU_PROJECT') >= 0) {
+      throw new Error('Configure config.js com SUPABASE_URL e SUPABASE_ANON_KEY');
+    }
+  }
+
+  function fnUrl(name) {
+    return window.SUPABASE_URL.replace(/\/$/, '') + '/functions/v1/' + name;
+  }
+
+  async function callFn(name, body) {
+    if (!accessToken) throw new Error('Sessão expirada — faça login de novo');
+    var res = await fetch(fnUrl(name), {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': 'Bearer ' + accessToken,
+        'apikey': window.SUPABASE_ANON_KEY,
+      },
+      body: JSON.stringify(body),
+    });
+    var json = await res.json().catch(function () { return {}; });
+    if (!res.ok) throw new Error(json.error || ('HTTP ' + res.status));
+    return json;
+  }
+
+  function setProg(pct, label, detail) {
+    $('progress-wrap').classList.remove('hidden');
+    $('prog-bar').style.width = Math.min(100, pct) + '%';
+    $('prog-pct').textContent = Math.round(pct) + '%';
+    if (label) $('prog-label').textContent = label;
+    if (detail !== undefined) $('prog-detail').textContent = detail;
+  }
+
+  function showPanel(email) {
+    $('login').classList.add('hidden');
+    $('panel').classList.remove('hidden');
+    $('user-email').textContent = email || '';
+  }
+
+  function showLogin(msg) {
+    $('panel').classList.add('hidden');
+    $('login').classList.remove('hidden');
+    accessToken = null;
+    if (msg) {
+      $('login-err').textContent = msg;
+      $('login-err').classList.remove('hidden');
+    }
+  }
+
+  async function init() {
+    try {
+      ensureConfig();
+      sb = window.supabase.createClient(window.SUPABASE_URL, window.SUPABASE_ANON_KEY);
+
+      sb.auth.onAuthStateChange(function (event, session) {
+        if (session && session.access_token) {
+          accessToken = session.access_token;
+          showPanel(session.user && session.user.email);
+        } else if (event === 'SIGNED_OUT') {
+          showLogin();
+        }
+      });
+
+      var sessionRes = await sb.auth.getSession();
+      var session = sessionRes.data && sessionRes.data.session;
+      if (session && session.access_token) {
+        accessToken = session.access_token;
+        showPanel(session.user && session.user.email);
+      }
+    } catch (e) {
+      showLogin(e.message);
+    }
+  }
+
+  $('btn-login').onclick = async function () {
+    $('login-err').classList.add('hidden');
+    var email = $('email').value.trim();
+    var password = $('password').value;
+    if (!email || !password) {
+      $('login-err').textContent = 'Informe e-mail e senha';
+      $('login-err').classList.remove('hidden');
+      return;
+    }
+    try {
+      ensureConfig();
+      if (!sb) sb = window.supabase.createClient(window.SUPABASE_URL, window.SUPABASE_ANON_KEY);
+      $('btn-login').disabled = true;
+      $('btn-login').textContent = 'Entrando…';
+      var res = await sb.auth.signInWithPassword({ email: email, password: password });
+      if (res.error) throw res.error;
+      accessToken = res.data.session.access_token;
+      showPanel(res.data.user.email);
+    } catch (e) {
+      $('login-err').textContent = e.message || 'Falha no login';
+      $('login-err').classList.remove('hidden');
+    } finally {
+      $('btn-login').disabled = false;
+      $('btn-login').textContent = 'Entrar';
+    }
+  };
+
+  $('password').addEventListener('keydown', function (e) {
+    if (e.key === 'Enter') $('btn-login').click();
+  });
+
+  $('btn-logout').onclick = async function () {
+    if (sb) await sb.auth.signOut();
+    showLogin();
+  };
+
+  $('file').onchange = function () {
+    $('btn-run').disabled = !$('file').files.length;
+  };
+
+  $('btn-run').onclick = async function () {
+    var file = $('file').files[0];
+    if (!file) return;
+
+    $('btn-run').disabled = true;
+    $('report').classList.add('hidden');
+    setProg(1, 'Lendo Excel…', file.name + ' (' + (file.size / 1024 / 1024).toFixed(1) + ' MB)');
+
+    try {
+      // refresh token se necessário
+      var sess = await sb.auth.getSession();
+      if (!sess.data.session) throw new Error('Sessão expirada — faça login de novo');
+      accessToken = sess.data.session.access_token;
+
+      var buf = await file.arrayBuffer();
+      setProg(5, 'Parseando planilha…', 'Arquivos grandes podem demorar alguns minutos');
+      await yieldToUI();
+
+      var wb = XLSX.read(buf, { type: 'array', cellDates: true, raw: false });
+      var sheet = wb.Sheets[wb.SheetNames[0]];
+      var aoa = XLSX.utils.sheet_to_json(sheet, { header: 1, defval: null, raw: false });
+      if (!aoa.length) throw new Error('Planilha vazia');
+
+      var header = aoa[0].map(function (h) { return String(h || '').trim(); });
+      var col = mapColumns(header);
+      var required = ['regional','loja','data','cod_produto','cod_dcto','qtde','valor'];
+      var missing = required.filter(function (k) { return col[k] === undefined; });
+      if (missing.length) throw new Error('Colunas faltando: ' + missing.join(', '));
+
+      var dataRows = [];
+      for (var i = 1; i < aoa.length; i++) {
+        var r = aoa[i];
+        if (!r || !r.length) continue;
+        dataRows.push({
+          regional: r[col.regional],
+          loja: r[col.loja],
+          mes: col.mes !== undefined ? r[col.mes] : null,
+          data: r[col.data],
+          cod_depto: col.cod_depto !== undefined ? r[col.cod_depto] : null,
+          depto: col.depto !== undefined ? r[col.depto] : null,
+          cod_produto: r[col.cod_produto],
+          produto: col.produto !== undefined ? r[col.produto] : null,
+          cod_dcto: r[col.cod_dcto],
+          especie: col.especie !== undefined ? r[col.especie] : null,
+          qtde: r[col.qtde],
+          valor: r[col.valor],
+        });
+      }
+
+      setProg(12, 'Iniciando lote…', dataRows.length.toLocaleString('pt-BR') + ' linhas lidas');
+
+      var start = await callFn('import-start', {
+        filename: file.name,
+        replace_all: $('replace').checked,
+      });
+      var batchId = start.batch_id;
+
+      var totalIn = 0, totalDup = 0, totalErr = 0;
+      var allErrs = [];
+      var totalChunks = Math.ceil(dataRows.length / CHUNK) || 1;
+
+      for (var c = 0; c < totalChunks; c++) {
+        // refresh token mid-import for long jobs
+        if (c % 25 === 0) {
+          var s2 = await sb.auth.getSession();
+          if (s2.data.session) accessToken = s2.data.session.access_token;
+        }
+        var slice = dataRows.slice(c * CHUNK, (c + 1) * CHUNK);
+        var pct = 12 + (c / totalChunks) * 78;
+        setProg(pct, 'Enviando lote ' + (c + 1) + ' / ' + totalChunks,
+          'Inseridos ' + totalIn.toLocaleString('pt-BR') +
+          ' · Dups ' + totalDup.toLocaleString('pt-BR') +
+          ' · Erros ' + totalErr.toLocaleString('pt-BR'));
+
+        var result = await callFn('import-chunk', {
+          batch_id: batchId,
+          offset: c * CHUNK,
+          rows: slice,
+        });
+        totalIn += result.inseridos || 0;
+        totalDup += result.duplicados || 0;
+        totalErr += result.erros || 0;
+        if (result.erros_detalhe) allErrs = allErrs.concat(result.erros_detalhe).slice(0, 80);
+        await yieldToUI();
+      }
+
+      setProg(93, 'Gerando auditoria vs BI…', '');
+
+      var finish = await callFn('import-finish', {
+        batch_id: batchId,
+        checkpoints: [{
+          nome: 'Ourinhos · ago · Açougue (Inventário 5201/5601)',
+          p_loja: 'Ourinhos',
+          p_mes: 'ago',
+          p_depto: 'Açougue',
+          esperado: {
+            '5201_abs': Number($('exp-5201').value),
+            '5601_abs': Number($('exp-5601').value),
+            resultado_inv: Number($('exp-res').value),
+          },
+        }],
+      });
+
+      setProg(100, 'Concluído', '');
+      renderReport({
+        file: file.name,
+        lidas: dataRows.length,
+        inseridos: totalIn,
+        duplicados: totalDup,
+        erros: totalErr,
+        erros_detalhe: allErrs,
+        finish: finish,
+      });
+    } catch (err) {
+      console.error(err);
+      setProg(0, 'Erro', '');
+      alert('Falha na importação: ' + err.message);
+      if (/autenticado|Sessão|401/i.test(err.message)) showLogin(err.message);
+    } finally {
+      $('btn-run').disabled = false;
+    }
+  };
+
+  function mapColumns(header) {
+    var aliases = {
+      regional: ['Regional'],
+      loja: ['Loja'],
+      mes: ['Mês', 'Mes'],
+      data: ['Data'],
+      cod_depto: ['Cod Depto', 'Cód Depto', 'Cod Depto.'],
+      depto: ['Depto', 'Departamento'],
+      cod_produto: ['Cod Produto', 'Cód Produto', 'Cod. Produto'],
+      produto: ['Produto'],
+      cod_dcto: ['Cod Dcto', 'Cód Dcto', 'Cod. Dcto', 'Cod Documento'],
+      especie: ['Especie', 'Espécie'],
+      qtde: ['Real Perda Total Qtde', 'Real Perda Total Qtde.', 'Qtde', 'Quantidade'],
+      valor: ['Real Perda Total R$', 'Valor', 'Real Perda Total'],
     };
-
-    var lastPayload = null;
-
-    // Login
-    function tryLogin() {
-      if (document.getElementById('pwd').value === ADMIN_PASSWORD) {
-        sessionStorage.setItem('painel_admin', '1');
-        showAdmin();
-      } else {
-        document.getElementById('pwd-err').classList.remove('hidden');
-      }
-    }
-    if (sessionStorage.getItem('painel_admin') === '1') showAdmin();
-    document.getElementById('btn-login').addEventListener('click', tryLogin);
-    document.getElementById('pwd').addEventListener('keydown', function (e) {
-      if (e.key === 'Enter') tryLogin();
-    });
-
-    function showAdmin() {
-      document.getElementById('login-screen').classList.add('hidden');
-      document.getElementById('admin-screen').classList.remove('hidden');
-    }
-
-    var fileInput = document.getElementById('file-input');
-    var btn = document.getElementById('btn-process');
-    fileInput.addEventListener('change', function () {
-      btn.disabled = !fileInput.files.length;
-    });
-
-    btn.addEventListener('click', function () {
-      if (!fileInput.files.length) return;
-      processFile(fileInput.files[0]);
-    });
-
-    function processFile(file) {
-      btn.disabled = true;
-      document.getElementById('btn-label').textContent = 'Processando...';
-      document.getElementById('btn-spin').classList.remove('hidden');
-      document.getElementById('result').classList.add('hidden');
-
-      var reader = new FileReader();
-      reader.onload = function (e) {
-        try {
-          var data = new Uint8Array(e.target.result);
-          var wb = XLSX.read(data, { type: 'array', cellDates: true });
-          var sheet = wb.Sheets[wb.SheetNames[0]];
-          var rows = XLSX.utils.sheet_to_json(sheet, { header: 1, defval: null, raw: false });
-
-          if (!rows.length) throw new Error('Planilha vazia');
-
-          // Detect header
-          var header = rows[0].map(function (h) { return String(h || '').trim(); });
-          var col = {};
-          var expected = {
-            'Regional': 'r', 'Loja': 'l', 'Mês': 'm', 'Mes': 'm',
-            'Data': 'd', 'Cod Depto': 'cd', 'Depto': 'dp',
-            'Cod Produto': 'cp', 'Produto': 'p', 'Cod Dcto': 'dc',
-            'Real Perda Total Qtde': 'q', 'Real Perda Total R$': 'v'
-          };
-          header.forEach(function (h, i) {
-            if (expected[h] !== undefined) col[expected[h]] = i;
-          });
-
-          var required = ['r','l','d','cp','dc','q','v'];
-          var missing = required.filter(function (k) { return col[k] === undefined; });
-          if (missing.length) throw new Error('Colunas obrigatórias ausentes. Verifique o cabeçalho.');
-
-          var out = [];
-          var erros = [];
-          var chaves = {};
-          var dups = 0;
-
-          for (var i = 1; i < rows.length; i++) {
-            var row = rows[i];
-            if (!row || !row.length) continue;
-
-            var codDcto = String(row[col.dc] != null ? row[col.dc] : '').trim();
-            if (!codDcto) continue;
-
-            if (!DOCUMENTOS[codDcto]) {
-              erros.push('Linha ' + (i + 1) + ': Cod Dcto ' + codDcto + ' não reconhecido');
-              continue;
-            }
-
-            var valorRaw = parseNum(row[col.v]);
-            var qtdeRaw = parseNum(row[col.q]);
-            if (valorRaw === null || qtdeRaw === null) {
-              erros.push('Linha ' + (i + 1) + ': valor ou quantidade inválidos');
-              continue;
-            }
-
-            var doc = DOCUMENTOS[codDcto];
-            var valorAbs = Math.abs(valorRaw);
-            var qtdeAbs = Math.abs(qtdeRaw);
-            var valorAp = doc.n === 'F' ? -valorAbs : valorAbs;
-            var qtdeAp = doc.n === 'F' ? -qtdeAbs : qtdeAbs;
-
-            var dataStr = parseDate(row[col.d]);
-            var mes = col.m !== undefined ? String(row[col.m] || '').replace('.', '') : '';
-            var regional = String(row[col.r] || '');
-            var loja = String(row[col.l] || '');
-            var codProd = String(row[col.cp] || '');
-
-            var chave = regional + '|' + loja + '|' + dataStr + '|' + codProd + '|' + codDcto + '|' + qtdeRaw + '|' + valorRaw;
-            if (chaves[chave]) { dups++; continue; }
-            chaves[chave] = true;
-
-            out.push({
-              r: regional,
-              l: loja,
-              m: mes,
-              d: dataStr,
-              cd: col.cd !== undefined ? String(row[col.cd] || '') : '',
-              dp: col.dp !== undefined ? String(row[col.dp] || '') : '',
-              cp: codProd,
-              p: col.p !== undefined ? String(row[col.p] || '') : '',
-              dc: codDcto,
-              t: doc.t,
-              n: doc.n,
-              v: Math.round(valorAp * 100) / 100,
-              q: Math.round(qtdeAp * 10000) / 10000
-            });
-          }
-
-          var meta = {
-            total: out.length,
-            duplicados_ignorados: dups,
-            erros: erros.length,
-            regionais: unique(out.map(function (x) { return x.r; })),
-            lojas: unique(out.map(function (x) { return x.l; })),
-            deptos: unique(out.map(function (x) { return x.dp; }).filter(Boolean)),
-            meses: unique(out.map(function (x) { return x.m; }).filter(Boolean)),
-            data_min: out.length ? out.map(function (x) { return x.d; }).sort()[0] : '',
-            data_max: out.length ? out.map(function (x) { return x.d; }).sort().reverse()[0] : '',
-            atualizado_em: new Date().toISOString()
-          };
-
-          lastPayload = { meta: meta, data: out };
-          saveToIDB(lastPayload).then(function () {
-            showResult(true, meta, erros);
-            document.getElementById('btn-download-js').classList.remove('hidden');
-          }).catch(function (err) {
-            showResult(false, null, ['Erro ao salvar no navegador: ' + err.message]);
-          });
-        } catch (err) {
-          console.error(err);
-          showResult(false, null, [err.message]);
+    var col = {};
+    header.forEach(function (h, i) {
+      Object.keys(aliases).forEach(function (key) {
+        if (aliases[key].some(function (a) { return a.toLowerCase() === h.toLowerCase(); })) {
+          col[key] = i;
         }
-        btn.disabled = false;
-        document.getElementById('btn-label').textContent = 'Processar e atualizar';
-        document.getElementById('btn-spin').classList.add('hidden');
-      };
-      reader.onerror = function () {
-        showResult(false, null, ['Erro ao ler o arquivo']);
-        btn.disabled = false;
-        document.getElementById('btn-label').textContent = 'Processar e atualizar';
-        document.getElementById('btn-spin').classList.add('hidden');
-      };
-      reader.readAsArrayBuffer(file);
-    }
-
-    function parseNum(v) {
-      if (v == null || v === '') return null;
-      if (typeof v === 'number') return v;
-      var s = String(v).replace(/\./g, '').replace(',', '.').replace(/[^\d.\-]/g, '');
-      var n = parseFloat(s);
-      return isNaN(n) ? null : n;
-    }
-
-    function parseDate(v) {
-      if (!v) return '';
-      if (v instanceof Date) {
-        var y = v.getFullYear(), m = v.getMonth() + 1, d = v.getDate();
-        return y + '-' + String(m).padStart(2, '0') + '-' + String(d).padStart(2, '0');
-      }
-      var s = String(v).trim();
-      // dd/mm/yyyy
-      var m1 = s.match(/^(\d{1,2})\/(\d{1,2})\/(\d{4})/);
-      if (m1) return m1[3] + '-' + m1[2].padStart(2, '0') + '-' + m1[1].padStart(2, '0');
-      // yyyy-mm-dd
-      if (/^\d{4}-\d{2}-\d{2}/.test(s)) return s.slice(0, 10);
-      return s.slice(0, 10);
-    }
-
-    function unique(arr) {
-      return Array.from(new Set(arr)).filter(Boolean).sort();
-    }
-
-    function saveToIDB(payload) {
-      return new Promise(function (resolve, reject) {
-        var req = indexedDB.open('painel_estoque', 1);
-        req.onupgradeneeded = function (e) {
-          var db = e.target.result;
-          if (!db.objectStoreNames.contains('base')) db.createObjectStore('base');
-        };
-        req.onsuccess = function (e) {
-          var db = e.target.result;
-          var tx = db.transaction('base', 'readwrite');
-          tx.objectStore('base').put(payload, 'data');
-          tx.oncomplete = function () { resolve(); };
-          tx.onerror = function () { reject(tx.error); };
-        };
-        req.onerror = function () { reject(req.error); };
-      });
-    }
-
-    function showResult(ok, meta, erros) {
-      var box = document.getElementById('result');
-      box.classList.remove('hidden');
-      if (ok) {
-        box.className = 'rounded-xl border border-emerald-200 bg-emerald-50 p-4 text-sm text-emerald-800';
-        box.innerHTML =
-          '<p class="font-semibold">Base atualizada com sucesso</p>' +
-          '<ul class="mt-2 space-y-0.5 text-xs">' +
-          '<li>' + meta.total.toLocaleString('pt-BR') + ' registros válidos</li>' +
-          '<li>' + meta.duplicados_ignorados + ' duplicados ignorados</li>' +
-          '<li>' + meta.erros + ' linhas com erro</li>' +
-          '<li>' + meta.lojas.length + ' lojas · ' + meta.deptos.length + ' departamentos</li>' +
-          '<li>Período: ' + meta.data_min + ' a ' + meta.data_max + '</li>' +
-          '</ul>' +
-          (erros && erros.length ? '<details class="mt-2"><summary class="text-xs cursor-pointer">Ver erros (' + erros.length + ')</summary><pre class="mt-1 text-[10px] overflow-auto max-h-32">' + erros.slice(0, 50).join('\n') + '</pre></details>' : '') +
-          '<p class="mt-3 text-xs">Abra o <a href="index.html" class="underline font-medium">painel</a> para ver os dados atualizados neste navegador.</p>';
-      } else {
-        box.className = 'rounded-xl border border-red-200 bg-red-50 p-4 text-sm text-red-800';
-        box.innerHTML = '<p class="font-semibold">Erro no processamento</p><ul class="mt-2 text-xs list-disc list-inside">' +
-          (erros || []).map(function (e) { return '<li>' + e + '</li>'; }).join('') + '</ul>';
-      }
-    }
-
-    document.getElementById('btn-download-js').addEventListener('click', function () {
-      if (!lastPayload) return;
-      var jsonString = JSON.stringify(lastPayload);
-      
-      // Comprimir usando gzip
-      var blob = new Blob([jsonString], { type: 'application/json' });
-      var stream = blob.stream().pipeThrough(new CompressionStream('gzip'));
-      
-      var compressedChunks = [];
-      var reader = stream.getReader();
-      
-      reader.read().then(function processChunk({ done, value }) {
-        if (done) {
-          // Quando terminar, criar arquivo .js.gz
-          var compressedBlob = new Blob(compressedChunks, { type: 'application/gzip' });
-          var a = document.createElement('a');
-          a.href = URL.createObjectURL(compressedBlob);
-          a.download = 'data.js.gz';
-          a.click();
-          return;
-        }
-        compressedChunks.push(value);
-        return reader.read().then(processChunk);
       });
     });
-  })();
-  </script>
+    return col;
+  }
+
+  function yieldToUI() {
+    return new Promise(function (r) { setTimeout(r, 0); });
+  }
+
+  function fmt(n) {
+    return Number(n).toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+  }
+
+  function renderReport(info) {
+    var box = $('report');
+    box.classList.remove('hidden');
+    var cp = (info.finish.checkpoints && info.finish.checkpoints[0]) || {};
+    var checks = cp.checks || [];
+    var aprovado = cp.aprovado;
+
+    var checksHtml = checks.map(function (c) {
+      var icon = c.ok ? '✅' : '❌';
+      return '<tr class="border-t border-slate-100">' +
+        '<td class="py-1.5 text-sm">' + icon + ' ' + c.campo + '</td>' +
+        '<td class="py-1.5 text-sm text-right tabular-nums">' + fmt(c.esperado) + '</td>' +
+        '<td class="py-1.5 text-sm text-right tabular-nums font-semibold">' + fmt(c.obtido) + '</td></tr>';
+    }).join('');
+
+    var docs = ((cp.auditoria && cp.auditoria.por_documento) || []).map(function (d) {
+      return '<tr class="border-t border-slate-100">' +
+        '<td class="py-1.5 text-sm font-medium">' + d.cod_dcto + '</td>' +
+        '<td class="py-1.5 text-xs">' + d.natureza + '</td>' +
+        '<td class="py-1.5 text-sm text-right">' + d.qtd_linhas + '</td>' +
+        '<td class="py-1.5 text-sm text-right tabular-nums">' + fmt(d.soma_original) + '</td>' +
+        '<td class="py-1.5 text-sm text-right tabular-nums">' + fmt(d.soma_abs) + '</td>' +
+        '<td class="py-1.5 text-sm text-right tabular-nums font-semibold">' + fmt(d.soma_apresentacao) + '</td></tr>';
+    }).join('');
+
+    var statusCls = aprovado === true ? 'bg-emerald-50 border-emerald-200 text-emerald-800' :
+      aprovado === false ? 'bg-red-50 border-red-200 text-red-800' : 'bg-slate-50 border-slate-200 text-slate-700';
+    var statusTxt = aprovado === true ? 'Checkpoint BI APROVADO' :
+      aprovado === false ? 'Checkpoint BI REPROVADO — confira os valores' : 'Sem checkpoint';
+
+    box.innerHTML =
+      '<div class="rounded-xl border p-4 ' + statusCls + '"><p class="font-bold">' + statusTxt + '</p></div>' +
+      '<div class="grid grid-cols-2 sm:grid-cols-4 gap-3 text-center">' +
+      '<div class="rounded-xl bg-slate-50 p-3"><p class="text-[10px] uppercase text-slate-400">Lidas</p><p class="text-lg font-bold">' + info.lidas.toLocaleString('pt-BR') + '</p></div>' +
+      '<div class="rounded-xl bg-emerald-50 p-3"><p class="text-[10px] uppercase text-emerald-600">Inseridas</p><p class="text-lg font-bold text-emerald-700">' + info.inseridos.toLocaleString('pt-BR') + '</p></div>' +
+      '<div class="rounded-xl bg-amber-50 p-3"><p class="text-[10px] uppercase text-amber-600">Duplicadas</p><p class="text-lg font-bold text-amber-700">' + info.duplicados.toLocaleString('pt-BR') + '</p></div>' +
+      '<div class="rounded-xl bg-red-50 p-3"><p class="text-[10px] uppercase text-red-600">Erros</p><p class="text-lg font-bold text-red-700">' + info.erros.toLocaleString('pt-BR') + '</p></div>' +
+      '</div>' +
+      '<div><h3 class="text-sm font-semibold text-slate-800 mb-2">Checkpoint: ' + (cp.nome || '') + '</h3>' +
+      '<table class="w-full text-left"><thead><tr class="text-[10px] uppercase text-slate-400"><th class="pb-1">Check</th><th class="pb-1 text-right">Esperado (BI)</th><th class="pb-1 text-right">Obtido</th></tr></thead><tbody>' + checksHtml + '</tbody></table></div>' +
+      '<div><h3 class="text-sm font-semibold text-slate-800 mb-2">Por documento (filtro do checkpoint)</h3>' +
+      '<div class="overflow-x-auto"><table class="w-full text-left min-w-[520px]"><thead><tr class="text-[10px] uppercase text-slate-400">' +
+      '<th class="pb-1">Cod</th><th class="pb-1">Nat.</th><th class="pb-1 text-right">Linhas</th><th class="pb-1 text-right">Σ original</th><th class="pb-1 text-right">Σ abs</th><th class="pb-1 text-right">Σ apresentação</th>' +
+      '</tr></thead><tbody>' + docs + '</tbody></table></div></div>' +
+      (info.erros_detalhe.length ? '<details class="text-xs"><summary class="cursor-pointer text-slate-500">Erros (' + info.erros_detalhe.length + ')</summary><pre class="mt-2 p-2 bg-slate-50 rounded-lg overflow-auto max-h-40">' + info.erros_detalhe.join('\n') + '</pre></details>' : '') +
+      '<p class="text-xs text-slate-500">Arquivo: ' + info.file + ' · <a class="text-sky-600 underline" href="index.html">Abrir painel</a></p>';
+  }
+
+  init();
+})();
+</script>
 </body>
 </html>
