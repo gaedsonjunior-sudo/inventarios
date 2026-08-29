@@ -478,16 +478,34 @@
         return '<th class="pb-2 font-medium text-center px-1.5 whitespace-nowrap">' + label + '</th>';
       }).join('');
 
-    body.innerHTML = linhas.map(function (row) {
+    if (!linhas.length) {
+      body.innerHTML = '<tr><td class="py-4 text-sm text-slate-400" colspan="' + (meses.length + 1) + '">Sem dados para esta regional</td></tr>';
+      return;
+    }
+
+    var totals = {};
+    meses.forEach(function (m) { totals[m] = 0; });
+    var rowsHtml = linhas.map(function (row) {
       var por = row.por_mes || {};
       return '<tr class="border-t border-slate-50">' +
         '<td class="py-1.5 pl-1 pr-2 text-sm font-medium text-slate-800 sticky left-0 bg-white whitespace-nowrap">' + row.loja + '</td>' +
         meses.map(function (m) {
           var v = por[m] != null ? Number(por[m]) : 0;
+          totals[m] += v;
           return '<td class="py-1.5 px-1.5 text-center tabular-nums text-xs whitespace-nowrap ' + moneyClass(v) + '">' + fmtMoney(v) + '</td>';
         }).join('') +
         '</tr>';
-    }).join('') || '<tr><td class="py-4 text-sm text-slate-400" colspan="' + (meses.length + 1) + '">Sem dados para esta regional</td></tr>';
+    }).join('');
+
+    var totalRow = '<tr class="border-t-2 border-slate-300 bg-slate-50">' +
+      '<td class="py-2 pl-1 pr-2 text-sm font-bold text-slate-900 sticky left-0 bg-slate-50 whitespace-nowrap">Total</td>' +
+      meses.map(function (m) {
+        var v = totals[m] || 0;
+        return '<td class="py-2 px-1.5 text-center tabular-nums text-xs font-bold whitespace-nowrap ' + moneyClass(v) + '">' + fmtMoney(v) + '</td>';
+      }).join('') +
+      '</tr>';
+
+    body.innerHTML = rowsHtml + totalRow;
   }
 
   function openListModal(title, html) {
