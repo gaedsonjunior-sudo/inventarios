@@ -1,12 +1,33 @@
--- Data da última importação + matrizes (lojas e deptos) × meses
--- Rode no SQL Editor
+-- Corrige conflito de overload e recria meta + matrizes
+-- Rode este arquivo inteiro no SQL Editor
 
--- Garante coluna se ainda não existir
+-- Remove TODAS as versões antigas
+drop function if exists api_matriz_lojas_mes(text, text[], char, char, date, date);
+drop function if exists api_matriz_lojas_mes(text, text, text[], text, char, char, date, date);
+drop function if exists api_matriz_lojas_mes cascade;
+drop function if exists api_matriz_deptos_mes cascade;
+
+-- (lista explícita das assinaturas mais comuns)
+do $$
+declare r record;
+begin
+  for r in
+    select p.oid::regprocedure as sig
+    from pg_proc p
+    join pg_namespace n on n.oid = p.pronamespace
+    where n.nspname = 'public'
+      and p.proname in ('api_matriz_lojas_mes', 'api_matriz_deptos_mes')
+  loop
+    execute 'drop function if exists ' || r.sig || ' cascade';
+  end loop;
+end $$;
+
+-- Garante created_at em import_batches
 do $$
 begin
   if not exists (
     select 1 from information_schema.columns
-    where table_name = 'import_batches' and column_name = 'created_at'
+    where table_schema = 'public' and table_name = 'import_batches' and column_name = 'created_at'
   ) then
     alter table import_batches add column created_at timestamptz default now();
   end if;
@@ -52,9 +73,8 @@ begin
 end;
 $$;
 
-grant execute on function api_meta to anon, authenticated;
+grant execute on function api_meta() to anon, authenticated;
 
--- Matriz lojas × meses (regional opcional; demais filtros aplicados)
 create or replace function api_matriz_lojas_mes(
   p_regional text default null,
   p_loja text default null,
@@ -132,9 +152,8 @@ begin
 end;
 $$;
 
-grant execute on function api_matriz_lojas_mes to anon, authenticated;
+grant execute on function api_matriz_lojas_mes(text, text, text[], text, char, char, date, date) to anon, authenticated;
 
--- Matriz departamentos × meses
 create or replace function api_matriz_deptos_mes(
   p_regional text default null,
   p_loja text default null,
@@ -212,4 +231,4 @@ begin
 end;
 $$;
 
-grant execute on function api_matriz_deptos_mes to anon, authenticated;
+grant execute on function api_matriz_deptos_mes(text, text, text[], text, char, char, date, date) to anon, authenticated;
