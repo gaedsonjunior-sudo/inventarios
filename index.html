@@ -231,7 +231,7 @@
       <div class="px-3 sm:px-4 py-2 sm:py-3 border-b border-slate-100 flex flex-wrap items-center justify-between gap-2">
         <div>
           <h2 class="text-sm font-semibold text-slate-800">Lojas × Meses</h2>
-          <p class="text-[11px] text-slate-400">Por loja da regional · filtro de tipo de ajuste</p>
+          <p class="text-[11px] text-slate-400">Todas as lojas (ou da regional filtrada) · tipo de ajuste</p>
         </div>
         <div class="flex flex-wrap items-center gap-1.5">
           <div class="flex flex-wrap gap-1">
@@ -255,6 +255,36 @@
         <p id="matriz-empty" class="hidden text-sm text-slate-400 py-6 text-center">Selecione uma regional nos filtros para ver o detalhamento</p>
       </div>
     </section>
+
+    <section class="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden">
+      <div class="px-3 sm:px-4 py-2 sm:py-3 border-b border-slate-100 flex flex-wrap items-center justify-between gap-2">
+        <div>
+          <h2 class="text-sm font-semibold text-slate-800">Departamentos × Meses</h2>
+          <p class="text-[11px] text-slate-400">Todos os departamentos (respeita filtros) · tipo de ajuste</p>
+        </div>
+        <div class="flex flex-wrap items-center gap-1.5">
+          <div class="flex flex-wrap gap-1">
+            <button data-matriz-depto="ALL" class="matriz-depto-btn chip-active px-2 py-1 sm:px-2.5 text-[10px] sm:text-[11px] font-medium rounded-lg">Total</button>
+            <button data-matriz-depto="N" class="matriz-depto-btn px-2 py-1 sm:px-2.5 text-[10px] sm:text-[11px] font-medium rounded-lg bg-slate-100 text-slate-600">Normal</button>
+            <button data-matriz-depto="T" class="matriz-depto-btn px-2 py-1 sm:px-2.5 text-[10px] sm:text-[11px] font-medium rounded-lg bg-slate-100 text-slate-600">TOP20</button>
+            <button data-matriz-depto="I" class="matriz-depto-btn px-2 py-1 sm:px-2.5 text-[10px] sm:text-[11px] font-medium rounded-lg bg-slate-100 text-slate-600">Inv. Dept.</button>
+          </div>
+          <button id="btn-expand-matriz-depto" class="text-[11px] text-brand-600 hover:text-brand-700 font-medium ml-1">Ver tudo</button>
+        </div>
+      </div>
+      <div class="px-2 sm:px-3 py-2 overflow-x-auto overflow-y-auto scrollbar-thin" style="max-height: 360px;" id="matriz-depto-wrap">
+        <table class="w-full text-left min-w-[520px]">
+          <thead>
+            <tr class="text-[10px] text-slate-400 uppercase sticky top-0 bg-white" id="matriz-depto-head">
+              <th class="pb-2 font-medium pl-1 text-left">Departamento</th>
+            </tr>
+          </thead>
+          <tbody id="matriz-depto-body"></tbody>
+        </table>
+      </div>
+    </section>
+
+
 
 <div class="grid grid-cols-1 lg:grid-cols-2 gap-3 sm:gap-4">
       <section class="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden">

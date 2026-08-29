@@ -10,6 +10,8 @@
   };
   var evolTipo = 'ALL';
   var matrizTipo = 'ALL';
+  var matrizDeptoTipo = 'ALL';
+  var lastMatrizDepto = null;
   var chartEvol = null;
   var loadingCount = 0;
 
@@ -94,6 +96,18 @@
   }
   function el(id) { return document.getElementById(id); }
 
+
+  function matrizFilterParams(tipoLocal) {
+    return {
+      p_regional: filters.regional || null,
+      p_loja: filters.loja || null,
+      p_deptos: (filters.depto && filters.depto.length) ? filters.depto : null,
+      p_mes: filters.mes || null,
+      p_tipo: tipoLocal === 'ALL' ? null : tipoLocal,
+      p_natureza: filters.natureza || null
+    };
+  }
+
   function filterParams() {
     return {
       p_regional: filters.regional || null,
@@ -165,7 +179,12 @@
   function setAtualizado() {
     var n = el('atualizado-em');
     if (!n) return;
-    var d = new Date();
+    var raw = META && META.atualizado_em;
+    var d = raw ? new Date(raw) : null;
+    if (!d || isNaN(d.getTime())) {
+      n.textContent = 'Base sem data de importação registrada';
+      return;
+    }
     n.textContent = 'Atualizado em ' + d.toLocaleDateString('pt-BR') + ' às ' + d.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' });
   }
 
@@ -315,18 +334,20 @@
         renderTopSobras(await rpc('api_top_produtos', Object.assign({}, p, { p_natureza: 'S', p_limit: topNS })) || []);
       }
 
-      // Matriz lojas x meses (regional)
+      // Matrizes × meses (respeitam filtros globais)
       try {
-        lastMatriz = await rpc('api_matriz_lojas_mes', {
-          p_regional: filters.regional || null,
-          p_deptos: (filters.depto && filters.depto.length) ? filters.depto : null,
-          p_tipo: matrizTipo === 'ALL' ? null : matrizTipo,
-          p_natureza: filters.natureza || null
-        });
+        lastMatriz = await rpc('api_matriz_lojas_mes', matrizFilterParams(matrizTipo));
         renderMatriz(lastMatriz);
       } catch (e2) {
-        console.warn('matriz', e2.message);
+        console.warn('matriz lojas', e2.message);
         renderMatriz(null);
+      }
+      try {
+        lastMatrizDepto = await rpc('api_matriz_deptos_mes', matrizFilterParams(matrizDeptoTipo));
+        renderMatrizDepto(lastMatrizDepto);
+      } catch (e3) {
+        console.warn('matriz deptos', e3.message);
+        renderMatrizDepto(null);
       }
 
       setAtualizado();
@@ -519,12 +540,6 @@
     var empty = el('matriz-empty');
     if (!head || !body) return;
 
-    if (!filters.regional) {
-      head.innerHTML = '<th class="pb-2 font-medium pl-1 text-left">Loja</th>';
-      body.innerHTML = '';
-      if (empty) empty.classList.remove('hidden');
-      return;
-    }
     if (empty) empty.classList.add('hidden');
 
     var meses = (data && data.meses) || [];
@@ -546,6 +561,50 @@
       var por = row.por_mes || {};
       return '<tr class="border-t border-slate-50">' +
         '<td class="py-1.5 pl-1 pr-2 text-sm font-medium text-slate-800 sticky left-0 bg-white whitespace-nowrap">' + row.loja + '</td>' +
+        meses.map(function (m) {
+          var v = por[m] != null ? Number(por[m]) : 0;
+          totals[m] += v;
+          return '<td class="py-1.5 px-1.5 text-center tabular-nums text-xs whitespace-nowrap ' + moneyClass(v) + '">' + fmtMoney(v) + '</td>';
+        }).join('') +
+        '</tr>';
+    }).join('');
+
+    var totalRow = '<tr class="border-t-2 border-slate-300 bg-slate-50">' +
+      '<td class="py-2 pl-1 pr-2 text-sm font-bold text-slate-900 sticky left-0 bg-slate-50 whitespace-nowrap">Total</td>' +
+      meses.map(function (m) {
+        var v = totals[m] || 0;
+        return '<td class="py-2 px-1.5 text-center tabular-nums text-xs font-bold whitespace-nowrap ' + moneyClass(v) + '">' + fmtMoney(v) + '</td>';
+      }).join('') +
+      '</tr>';
+
+    body.innerHTML = rowsHtml + totalRow;
+  }
+
+
+  function renderMatrizDepto(data) {
+    var head = el('matriz-depto-head');
+    var body = el('matriz-depto-body');
+    if (!head || !body) return;
+
+    var meses = (data && data.meses) || [];
+    var linhas = (data && data.linhas) || [];
+    head.innerHTML = '<th class="pb-2 font-medium pl-1 text-left sticky left-0 bg-white z-10">Departamento</th>' +
+      meses.map(function (m) {
+        var label = m ? (m.charAt(0).toUpperCase() + m.slice(1)) : m;
+        return '<th class="pb-2 font-medium text-center px-1.5 whitespace-nowrap">' + label + '</th>';
+      }).join('');
+
+    if (!linhas.length) {
+      body.innerHTML = '<tr><td class="py-4 text-sm text-slate-400" colspan="' + (meses.length + 1) + '">Sem dados</td></tr>';
+      return;
+    }
+
+    var totals = {};
+    meses.forEach(function (m) { totals[m] = 0; });
+    var rowsHtml = linhas.map(function (row) {
+      var por = row.por_mes || {};
+      return '<tr class="border-t border-slate-50">' +
+        '<td class="py-1.5 pl-1 pr-2 text-sm font-medium text-slate-800 sticky left-0 bg-white whitespace-nowrap">' + (row.depto || '') + '</td>' +
         meses.map(function (m) {
           var v = por[m] != null ? Number(por[m]) : 0;
           totals[m] += v;
@@ -698,19 +757,9 @@
         b.classList.toggle('bg-slate-100', b !== btn);
         b.classList.toggle('text-slate-600', b !== btn);
       });
-      // Recarrega só a matriz (mais leve)
-      if (!filters.regional) {
-        renderMatriz(null);
-        return;
-      }
       try {
         setLoading(true);
-        lastMatriz = await rpc('api_matriz_lojas_mes', {
-          p_regional: filters.regional || null,
-          p_deptos: (filters.depto && filters.depto.length) ? filters.depto : null,
-          p_tipo: matrizTipo === 'ALL' ? null : matrizTipo,
-          p_natureza: filters.natureza || null
-        });
+        lastMatriz = await rpc('api_matriz_lojas_mes', matrizFilterParams(matrizTipo));
         renderMatriz(lastMatriz);
       } catch (err) {
         console.error(err);
@@ -719,6 +768,32 @@
         setLoading(false);
       }
     });
+  });
+
+  document.querySelectorAll('.matriz-depto-btn').forEach(function (btn) {
+    btn.addEventListener('click', async function () {
+      matrizDeptoTipo = btn.dataset.matrizDepto;
+      document.querySelectorAll('.matriz-depto-btn').forEach(function (b) {
+        b.classList.toggle('chip-active', b === btn);
+        b.classList.toggle('bg-slate-100', b !== btn);
+        b.classList.toggle('text-slate-600', b !== btn);
+      });
+      try {
+        setLoading(true);
+        lastMatrizDepto = await rpc('api_matriz_deptos_mes', matrizFilterParams(matrizDeptoTipo));
+        renderMatrizDepto(lastMatrizDepto);
+      } catch (err) {
+        console.error(err);
+        alert('Erro na matriz departamentos: ' + err.message);
+      } finally {
+        setLoading(false);
+      }
+    });
+  });
+
+  if (el('btn-expand-matriz-depto')) el('btn-expand-matriz-depto').addEventListener('click', function () {
+    var wrap = el('matriz-depto-wrap');
+    if (wrap) openListModal('Departamentos × Meses', wrap.innerHTML);
   });
 
   init();
