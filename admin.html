@@ -92,7 +92,7 @@
 
 <script>
 (function () {
-  var CHUNK = 150; // menor: PostgREST direto tolera menos que Edge Function
+  var CHUNK = 80; // menor: PostgREST direto tolera menos que Edge Function
   var sb = null;
   var DOCS = {
     '6416': { t: 'N', n: 'S' }, '6417': { t: 'N', n: 'F' },
@@ -303,14 +303,9 @@
       setProg(10, 'Preparando lote…', dataRows.length.toLocaleString('pt-BR') + ' linhas');
 
       if ($('replace').checked) {
-        setProg(11, 'Limpando base…', '');
-        // PostgREST exige WHERE — usar neq evita "DELETE requires a WHERE clause"
-        var clr = await sb.from('lancamentos').delete().neq('id', 0);
-        if (clr.error) {
-          // fallback RPC
-          var clr2 = await sb.rpc('admin_clear_lancamentos');
-          if (clr2.error) throw clr2.error || clr.error;
-        }
+        setProg(11, 'Limpando base…', 'TRUNCATE (rápido) — aguarde');
+        var clr = await sb.rpc('admin_clear_lancamentos');
+        if (clr.error) throw clr.error;
       }
 
       var batchIns = await sb.from('import_batches').insert({
@@ -428,30 +423,36 @@
         }
 
         if (toInsert.length) {
-          // INSERT puro — não usamos ignoreDuplicates (não descartar linhas da planilha)
-          var ins = await sb.from('lancamentos').insert(toInsert).select('id');
-
+          // RPC com statement_timeout maior — mais estável que insert direto em massa
+          var ins = await sb.rpc('admin_insert_lancamentos', { p_rows: toInsert });
           if (ins.error) {
-            // se o lote falhar, tenta linha a linha para isolar problemas
-            for (var k = 0; k < toInsert.length; k++) {
-              var one = await sb.from('lancamentos').insert(toInsert[k]).select('id');
+            // fallback: insert direto em sublotes de 20
+            for (var k = 0; k < toInsert.length; k += 20) {
+              var sub = toInsert.slice(k, k + 20);
+              var one = await sb.from('lancamentos').insert(sub).select('id');
               if (one.error) {
-                if (String(one.error.message || '').indexOf('duplicate') >= 0 || one.error.code === '23505') {
-                  // colisão extremamente rara (mesma linha reimportada) — força chave única extra
-                  toInsert[k].chave_unica = toInsert[k].chave_unica + '-r' + String(k) + '-' + String(Date.now());
-                  var retry = await sb.from('lancamentos').insert(toInsert[k]).select('id');
-                  if (retry.error) {
-                    totalErr++;
-                    if (allErrs.length < 50) allErrs.push(retry.error.message);
+                for (var m = 0; m < sub.length; m++) {
+                  var row = Object.assign({}, sub[m]);
+                  var single = await sb.from('lancamentos').insert(row).select('id');
+                  if (single.error) {
+                    row.chave_unica = row.chave_unica + '-r' + String(m) + '-' + String(Date.now());
+                    var retry = await sb.from('lancamentos').insert(row).select('id');
+                    if (retry.error) {
+                      totalErr++;
+                      if (allErrs.length < 50) allErrs.push(retry.error.message);
+                    } else totalIn++;
                   } else totalIn++;
-                } else {
-                  totalErr++;
-                  if (allErrs.length < 50) allErrs.push(one.error.message);
                 }
-              } else totalIn++;
+              } else {
+                totalIn += (one.data && one.data.length) || sub.length;
+              }
             }
           } else {
-            totalIn += (ins.data && ins.data.length) || toInsert.length;
+            totalIn += (ins.data && ins.data.inseridos) || toInsert.length;
+            totalErr += (ins.data && ins.data.erros) || 0;
+            if (ins.data && ins.data.erros_detalhe) {
+              allErrs = allErrs.concat(ins.data.erros_detalhe).slice(0, 80);
+            }
           }
         }
 

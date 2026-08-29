@@ -764,13 +764,15 @@ create policy "auth update batches" on import_batches for update to authenticate
 create or replace function admin_clear_lancamentos()
 returns void
 language plpgsql
-security invoker
+security definer
+set search_path = public
 as $$
 begin
   if auth.uid() is null then
     raise exception 'Não autenticado';
   end if;
-  delete from lancamentos where id is not null;  -- PostgREST exige WHERE
+  truncate table lancamentos restart identity;
 end;
 $$;
+revoke all on function admin_clear_lancamentos() from public;
 grant execute on function admin_clear_lancamentos() to authenticated;
