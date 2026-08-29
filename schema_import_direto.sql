@@ -36,7 +36,7 @@ begin
   if auth.uid() is null then
     raise exception 'Não autenticado';
   end if;
-  delete from lancamentos;
+  delete from lancamentos where id is not null;  -- PostgREST exige WHERE
 end;
 $$;
 grant execute on function admin_clear_lancamentos() to authenticated;

@@ -304,8 +304,13 @@
 
       if ($('replace').checked) {
         setProg(11, 'Limpando base…', '');
-        var clr = await sb.rpc('admin_clear_lancamentos');
-        if (clr.error) throw clr.error;
+        // PostgREST exige WHERE — usar neq evita "DELETE requires a WHERE clause"
+        var clr = await sb.from('lancamentos').delete().neq('id', 0);
+        if (clr.error) {
+          // fallback RPC
+          var clr2 = await sb.rpc('admin_clear_lancamentos');
+          if (clr2.error) throw clr2.error || clr.error;
+        }
       }
 
       var batchIns = await sb.from('import_batches').insert({
@@ -390,7 +395,8 @@
             var absQ = Math.abs(qtdeOrig);
             var valorAp = doc.n === 'F' ? -absV : absV;
             var qtdeAp = doc.n === 'F' ? -absQ : absQ;
-            var chave = await shaKey([regional, loja, dataStr, codProd, codDcto, String(qtdeOrig), String(valorOrig)]);
+            // Inclui número da linha da planilha para NUNCA descartar linhas legítimas
+            var chave = await shaKey([regional, loja, dataStr, codProd, codDcto, String(qtdeOrig), String(valorOrig), 'L' + String(row._line)]);
 
             var regId = await getReg(regional);
             var lojaId = await getLoja(loja, regId);
@@ -422,27 +428,30 @@
         }
 
         if (toInsert.length) {
-          var ins = await sb.from('lancamentos').upsert(toInsert, {
-            onConflict: 'chave_unica',
-            ignoreDuplicates: true
-          }).select('id');
+          // INSERT puro — não usamos ignoreDuplicates (não descartar linhas da planilha)
+          var ins = await sb.from('lancamentos').insert(toInsert).select('id');
 
           if (ins.error) {
-            // tenta um a um
+            // se o lote falhar, tenta linha a linha para isolar problemas
             for (var k = 0; k < toInsert.length; k++) {
               var one = await sb.from('lancamentos').insert(toInsert[k]).select('id');
               if (one.error) {
-                if (String(one.error.message || '').indexOf('duplicate') >= 0 || one.error.code === '23505') totalDup++;
-                else {
+                if (String(one.error.message || '').indexOf('duplicate') >= 0 || one.error.code === '23505') {
+                  // colisão extremamente rara (mesma linha reimportada) — força chave única extra
+                  toInsert[k].chave_unica = toInsert[k].chave_unica + '-r' + String(k) + '-' + String(Date.now());
+                  var retry = await sb.from('lancamentos').insert(toInsert[k]).select('id');
+                  if (retry.error) {
+                    totalErr++;
+                    if (allErrs.length < 50) allErrs.push(retry.error.message);
+                  } else totalIn++;
+                } else {
                   totalErr++;
                   if (allErrs.length < 50) allErrs.push(one.error.message);
                 }
               } else totalIn++;
             }
           } else {
-            var got = (ins.data && ins.data.length) || 0;
-            totalIn += got;
-            totalDup += toInsert.length - got;
+            totalIn += (ins.data && ins.data.length) || toInsert.length;
           }
         }
 
