@@ -43,6 +43,26 @@
       text-align: left;
       white-space: nowrap;
     }
+
+    .kpi-card { text-align: center; }
+    .kpi-card .kpi-label { text-align: center; }
+    .kpi-card .kpi-value {
+      font-variant-numeric: tabular-nums;
+      letter-spacing: -0.02em;
+      text-align: center;
+      width: 100%;
+      display: block;
+    }
+    @media (max-width: 640px) {
+      .kpi-card .kpi-value { font-size: 1.05rem !important; line-height: 1.25; }
+      table.rank-table td.col-val,
+      table.rank-table th.col-val { font-size: 0.7rem; padding-left: 0.25rem; padding-right: 0.25rem; }
+      table.rank-table td.col-name { font-size: 0.75rem; max-width: 7.5rem; overflow: hidden; text-overflow: ellipsis; }
+      #matriz-body td, #matriz-head th { font-size: 0.65rem !important; padding-left: 0.2rem !important; padding-right: 0.2rem !important; }
+      #rank-faltas .text-sm, #rank-sobras .text-sm { font-size: 0.75rem; }
+      #rank-faltas span.tabular-nums, #rank-sobras span.tabular-nums { font-size: 0.75rem; }
+    }
+
     .drawer { transform: translateX(100%); transition: transform .3s ease; }
     .drawer.open { transform: translateX(0); }
     .spinner { border: 3px solid #e2e8f0; border-top-color: #0ea5e9; border-radius: 50%; width: 40px; height: 40px; animation: spin .8s linear infinite; }
@@ -85,21 +105,21 @@
     <div id="active-filters" class="flex flex-wrap gap-1.5 empty:hidden"></div>
 
     <section class="grid grid-cols-2 lg:grid-cols-4 gap-3">
-      <div class="bg-white rounded-2xl border border-slate-200 p-3 sm:p-4 shadow-sm">
+      <div class="bg-white rounded-2xl border border-slate-200 p-3 sm:p-4 shadow-sm" kpi-card text-center>
         <p class="text-[10px] font-semibold text-slate-400 uppercase tracking-wider">Total</p>
-        <p id="kpi-total" class="mt-1 text-lg sm:text-xl font-bold tabular-nums">—</p>
+        <p id="kpi-total" class="mt-1 text-lg sm:text-xl font-bold tabular-nums kpi-value text-center">—</p>
       </div>
-      <div class="bg-white rounded-2xl border border-slate-200 p-3 sm:p-4 shadow-sm">
+      <div class="bg-white rounded-2xl border border-slate-200 p-3 sm:p-4 shadow-sm" kpi-card text-center>
         <p class="text-[10px] font-semibold text-slate-400 uppercase tracking-wider">Ajuste Normal</p>
-        <p id="kpi-normal" class="mt-1 text-lg sm:text-xl font-bold tabular-nums">—</p>
+        <p id="kpi-normal" class="mt-1 text-lg sm:text-xl font-bold tabular-nums kpi-value text-center">—</p>
       </div>
-      <div class="bg-white rounded-2xl border border-slate-200 p-3 sm:p-4 shadow-sm">
+      <div class="bg-white rounded-2xl border border-slate-200 p-3 sm:p-4 shadow-sm" kpi-card text-center>
         <p class="text-[10px] font-semibold text-slate-400 uppercase tracking-wider">TOP20</p>
-        <p id="kpi-top20" class="mt-1 text-lg sm:text-xl font-bold tabular-nums">—</p>
+        <p id="kpi-top20" class="mt-1 text-lg sm:text-xl font-bold tabular-nums kpi-value text-center">—</p>
       </div>
-      <div class="bg-white rounded-2xl border border-slate-200 p-3 sm:p-4 shadow-sm">
+      <div class="bg-white rounded-2xl border border-slate-200 p-3 sm:p-4 shadow-sm" kpi-card text-center>
         <p class="text-[10px] font-semibold text-slate-400 uppercase tracking-wider">Inv. Departamental</p>
-        <p id="kpi-inv" class="mt-1 text-lg sm:text-xl font-bold tabular-nums">—</p>
+        <p id="kpi-inv" class="mt-1 text-lg sm:text-xl font-bold tabular-nums kpi-value text-center">—</p>
       </div>
     </section>
 

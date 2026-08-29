@@ -12,6 +12,60 @@
   var matrizTipo = 'ALL';
   var chartEvol = null;
   var loadingCount = 0;
+
+  // Cache em memória + localStorage (evita reconsultar mesmos filtros)
+  var memCache = {};
+  var CACHE_TTL_MS = 30 * 60 * 1000; // 30 min
+  var CACHE_PREFIX = 'painel_cache_v1:';
+
+  function cacheKey(name, params) {
+    return name + '::' + JSON.stringify(params || {});
+  }
+
+  function cacheGet(name, params) {
+    var key = cacheKey(name, params);
+    var now = Date.now();
+    if (memCache[key] && memCache[key].exp > now) return memCache[key].data;
+    try {
+      var raw = localStorage.getItem(CACHE_PREFIX + key);
+      if (raw) {
+        var obj = JSON.parse(raw);
+        if (obj && obj.exp > now) {
+          memCache[key] = obj;
+          return obj.data;
+        }
+        localStorage.removeItem(CACHE_PREFIX + key);
+      }
+    } catch (e) {}
+    return null;
+  }
+
+  function cacheSet(name, params, data) {
+    var key = cacheKey(name, params);
+    var obj = { exp: Date.now() + CACHE_TTL_MS, data: data };
+    memCache[key] = obj;
+    try {
+      localStorage.setItem(CACHE_PREFIX + key, JSON.stringify(obj));
+    } catch (e) {
+      // quota cheia: limpa caches antigos
+      try {
+        Object.keys(localStorage).forEach(function (k) {
+          if (k.indexOf(CACHE_PREFIX) === 0) localStorage.removeItem(k);
+        });
+        localStorage.setItem(CACHE_PREFIX + key, JSON.stringify(obj));
+      } catch (e2) {}
+    }
+  }
+
+  function cacheClearAll() {
+    memCache = {};
+    try {
+      Object.keys(localStorage).forEach(function (k) {
+        if (k.indexOf(CACHE_PREFIX) === 0) localStorage.removeItem(k);
+      });
+    } catch (e) {}
+  }
+
   var lastDashboard = null;
   var lastMatriz = null;
   var cacheLojas = [];
@@ -66,9 +120,16 @@
     }
   }
 
-  async function rpc(name, params) {
+  async function rpc(name, params, opts) {
+    opts = opts || {};
+    var skipCache = opts.skipCache || name === 'api_produto_detalhe';
+    if (!skipCache) {
+      var hit = cacheGet(name, params);
+      if (hit !== null && hit !== undefined) return hit;
+    }
     var res = await sb.rpc(name, params || {});
     if (res.error) throw new Error(res.error.message || JSON.stringify(res.error));
+    if (!skipCache) cacheSet(name, params, res.data);
     return res.data;
   }
 
@@ -212,19 +273,18 @@
 
   async function refreshAll() {
     renderActiveChips();
-    setLoading(true);
     var p = filterParams();
     var topN = parseInt((el('top-n-faltas') && el('top-n-faltas').value) || '10', 10);
     var topNS = parseInt((el('top-n-sobras') && el('top-n-sobras').value) || '10', 10);
+    var dashParams = Object.assign({}, p, { p_top_faltas: topN, p_top_sobras: topNS });
+    var fromCache = cacheGet('api_dashboard', dashParams) != null;
+    if (!fromCache) setLoading(true);
 
     try {
-      // Prefer single RPC (faster); fallback to parallel individuais
+      // Prefer single RPC (faster); fallback to individuais
       var dash = null;
       try {
-        dash = await rpc('api_dashboard', Object.assign({}, p, {
-          p_top_faltas: topN,
-          p_top_sobras: topNS
-        }));
+        dash = await rpc('api_dashboard', dashParams);
       } catch (e1) {
         console.warn('api_dashboard indisponível, usando RPCs individuais', e1.message);
       }
@@ -283,7 +343,7 @@
       var node = el(id);
       if (!node) return;
       node.textContent = fmtMoney(v);
-      node.className = node.className.replace(/text-(falta|sobra|slate-700|slate-800)/g, '').trim() + ' ' + moneyClass(v);
+      node.className = ('kpi-value text-center mt-1 text-lg sm:text-xl font-bold tabular-nums ' + moneyClass(v)).trim();
     }
     set('kpi-total', k.total);
     set('kpi-normal', k.N);
