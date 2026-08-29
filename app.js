@@ -364,7 +364,7 @@
       var node = el(id);
       if (!node) return;
       node.textContent = fmtMoney(v);
-      node.className = ('kpi-value text-center mt-1 text-lg sm:text-xl font-bold tabular-nums ' + moneyClass(v)).trim();
+      node.className = ('kpi-value text-center mt-1 font-bold tabular-nums ' + moneyClass(v)).trim();
     }
     set('kpi-total', k.total);
     set('kpi-normal', k.N);
@@ -373,13 +373,13 @@
   }
 
   function cellMoney(v) {
-    return '<td class="py-2 tabular-nums text-sm col-val ' + moneyClass(v) + '">' + fmtMoney(v) + '</td>';
+    return '<td class="py-1.5 tabular-nums text-xs col-val ' + moneyClass(v) + '">' + fmtMoney(v) + '</td>';
   }
 
   function rankingRows(list, nameKey, dataAttr) {
     return (list || []).map(function (row) {
       return '<tr class="border-t border-slate-50 hover:bg-slate-50 cursor-pointer" ' + dataAttr + '="' + row[nameKey] + '">' +
-        '<td class="py-2 pl-1 text-sm font-medium text-slate-800 col-name">' + row[nameKey] + '</td>' +
+        '<td class="py-1.5 pl-1 text-sm font-medium text-slate-800 col-name">' + row[nameKey] + '</td>' +
         cellMoney(row.N) + cellMoney(row.T) + cellMoney(row.I) + cellMoney(row.total) +
         '</tr>';
     }).join('');
@@ -511,8 +511,8 @@
       return '<button data-prod="' + p.cod + '" class="w-full text-left px-3 py-2.5 hover:bg-slate-50 flex items-start gap-2">' +
         '<span class="text-[11px] text-slate-400 w-5 shrink-0">' + (i + 1) + '</span>' +
         '<div class="min-w-0 flex-1"><p class="text-sm font-medium text-slate-800 truncate">' + p.produto + '</p>' +
-        '<p class="text-[11px] text-slate-400 mt-0.5">' + (p.depto || '') + ' · Cód ' + p.cod + '</p></div>' +
-        '<span class="text-sm font-semibold tabular-nums ' + moneyClass(p.valor) + '">' + fmtMoney(p.valor) + '</span></button>';
+        '<p class="text-[10px] text-slate-400 mt-0.5">' + (p.depto || '') + ' · Cód ' + p.cod + '</p></div>' +
+        '<span class="text-xs font-semibold tabular-nums ' + moneyClass(p.valor) + '">' + fmtMoney(p.valor) + '</span></button>';
     }).join('') || '<p class="p-4 text-sm text-slate-400">Sem dados</p>';
     box.querySelectorAll('[data-prod]').forEach(function (btn) {
       btn.addEventListener('click', function () { openProductModal(btn.dataset.prod); });
@@ -526,8 +526,8 @@
       return '<button data-prod="' + p.cod + '" class="w-full text-left px-3 py-2.5 hover:bg-slate-50 flex items-start gap-2">' +
         '<span class="text-[11px] text-slate-400 w-5 shrink-0">' + (i + 1) + '</span>' +
         '<div class="min-w-0 flex-1"><p class="text-sm font-medium text-slate-800 truncate">' + p.produto + '</p>' +
-        '<p class="text-[11px] text-slate-400 mt-0.5">' + (p.depto || '') + ' · Cód ' + p.cod + '</p></div>' +
-        '<span class="text-sm font-semibold tabular-nums ' + moneyClass(p.valor) + '">' + fmtMoney(p.valor) + '</span></button>';
+        '<p class="text-[10px] text-slate-400 mt-0.5">' + (p.depto || '') + ' · Cód ' + p.cod + '</p></div>' +
+        '<span class="text-xs font-semibold tabular-nums ' + moneyClass(p.valor) + '">' + fmtMoney(p.valor) + '</span></button>';
     }).join('') || '<p class="p-4 text-sm text-slate-400">Sem dados</p>';
     box.querySelectorAll('[data-prod]').forEach(function (btn) {
       btn.addEventListener('click', function () { openProductModal(btn.dataset.prod); });
@@ -544,10 +544,10 @@
 
     var meses = (data && data.meses) || [];
     var linhas = (data && data.linhas) || [];
-    head.innerHTML = '<th class="pb-2 font-medium pl-1 text-left sticky left-0 bg-white z-10">Loja</th>' +
+    head.innerHTML = '<th class="pb-2 font-medium pl-1 text-left sticky left-0 bg-white z-10 col-name">Loja</th>' +
       meses.map(function (m) {
         var label = m ? (m.charAt(0).toUpperCase() + m.slice(1)) : m;
-        return '<th class="pb-2 font-medium text-center px-1.5 whitespace-nowrap">' + label + '</th>';
+        return '<th class="pb-2 font-medium text-center px-1.5 whitespace-nowrap col-val">' + label + '</th>';
       }).join('');
 
     if (!linhas.length) {
@@ -560,11 +560,11 @@
     var rowsHtml = linhas.map(function (row) {
       var por = row.por_mes || {};
       return '<tr class="border-t border-slate-50">' +
-        '<td class="py-1.5 pl-1 pr-2 text-sm font-medium text-slate-800 sticky left-0 bg-white whitespace-nowrap">' + row.loja + '</td>' +
+        '<td class="py-1.5 pl-1 pr-2 text-sm font-medium text-slate-800 sticky left-0 bg-white whitespace-nowrap col-name">' + row.loja + '</td>' +
         meses.map(function (m) {
           var v = por[m] != null ? Number(por[m]) : 0;
           totals[m] += v;
-          return '<td class="py-1.5 px-1.5 text-center tabular-nums text-xs whitespace-nowrap ' + moneyClass(v) + '">' + fmtMoney(v) + '</td>';
+          return '<td class="py-1.5 px-1.5 text-center tabular-nums text-xs whitespace-nowrap col-val ' + moneyClass(v) + '">' + fmtMoney(v) + '</td>';
         }).join('') +
         '</tr>';
     }).join('');
@@ -588,10 +588,10 @@
 
     var meses = (data && data.meses) || [];
     var linhas = (data && data.linhas) || [];
-    head.innerHTML = '<th class="pb-2 font-medium pl-1 text-left sticky left-0 bg-white z-10">Departamento</th>' +
+    head.innerHTML = '<th class="pb-2 font-medium pl-1 text-left sticky left-0 bg-white z-10 col-name">Departamento</th>' +
       meses.map(function (m) {
         var label = m ? (m.charAt(0).toUpperCase() + m.slice(1)) : m;
-        return '<th class="pb-2 font-medium text-center px-1.5 whitespace-nowrap">' + label + '</th>';
+        return '<th class="pb-2 font-medium text-center px-1.5 whitespace-nowrap col-val">' + label + '</th>';
       }).join('');
 
     if (!linhas.length) {
@@ -604,11 +604,11 @@
     var rowsHtml = linhas.map(function (row) {
       var por = row.por_mes || {};
       return '<tr class="border-t border-slate-50">' +
-        '<td class="py-1.5 pl-1 pr-2 text-sm font-medium text-slate-800 sticky left-0 bg-white whitespace-nowrap">' + (row.depto || '') + '</td>' +
+        '<td class="py-1.5 pl-1 pr-2 text-sm font-medium text-slate-800 sticky left-0 bg-white whitespace-nowrap col-name">' + (row.depto || '') + '</td>' +
         meses.map(function (m) {
           var v = por[m] != null ? Number(por[m]) : 0;
           totals[m] += v;
-          return '<td class="py-1.5 px-1.5 text-center tabular-nums text-xs whitespace-nowrap ' + moneyClass(v) + '">' + fmtMoney(v) + '</td>';
+          return '<td class="py-1.5 px-1.5 text-center tabular-nums text-xs whitespace-nowrap col-val ' + moneyClass(v) + '">' + fmtMoney(v) + '</td>';
         }).join('') +
         '</tr>';
     }).join('');
