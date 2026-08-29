@@ -1,5 +1,19 @@
 # Painel Inventários — Supabase + Importação Web
 
+## Importação SEM CLI / SEM Edge Function (recomendado neste ambiente)
+
+O `admin.html` grava **direto** no Postgres via sessão autenticada (PostgREST).
+
+1. Rode `schema.sql` (ou, se já rodou, só `schema_import_direto.sql`)
+2. Crie usuário em Authentication → Users
+3. Publique o front (`admin.html`, `config.js`, …)
+4. Login no admin → enviar Excel
+
+**Não precisa** instalar Supabase CLI nem deploy de functions.
+
+As pastas `supabase/functions/*` ficam opcionais (caso no futuro tenha CLI).
+
+
 ## Arquitetura
 
 ```

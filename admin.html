@@ -20,21 +20,13 @@
     <div class="bg-white rounded-2xl shadow-lg border border-slate-200 p-6 w-full max-w-sm">
       <h1 class="text-lg font-bold text-slate-900">Área administrativa</h1>
       <p class="text-sm text-slate-500 mt-1">Login via Supabase Auth</p>
-
       <label class="block text-xs font-medium text-slate-500 uppercase mt-5">E-mail</label>
-      <input type="email" id="email" autocomplete="username" class="mt-1 w-full border border-slate-200 rounded-xl px-3 py-2.5 text-sm" placeholder="admin@empresa.com" />
-
+      <input type="email" id="email" autocomplete="username" class="mt-1 w-full border border-slate-200 rounded-xl px-3 py-2.5 text-sm" />
       <label class="block text-xs font-medium text-slate-500 uppercase mt-3">Senha</label>
-      <input type="password" id="password" autocomplete="current-password" class="mt-1 w-full border border-slate-200 rounded-xl px-3 py-2.5 text-sm" placeholder="••••••••" />
-
+      <input type="password" id="password" autocomplete="current-password" class="mt-1 w-full border border-slate-200 rounded-xl px-3 py-2.5 text-sm" />
       <p id="login-err" class="text-xs text-red-500 mt-2 hidden"></p>
-
       <button id="btn-login" class="mt-4 w-full py-2.5 text-sm font-semibold rounded-xl bg-sky-600 text-white hover:bg-sky-700">Entrar</button>
       <a href="index.html" class="block text-center text-xs text-sky-600 mt-4">← Voltar ao painel</a>
-      <p class="text-[11px] text-slate-400 mt-4 text-center leading-relaxed">
-        Crie o usuário em Supabase → Authentication → Users.<br />
-        Opcional: App Metadata <code class="bg-slate-100 px-1 rounded">{"role":"admin"}</code>
-      </p>
     </div>
   </div>
 
@@ -43,6 +35,7 @@
       <div>
         <h1 class="text-xl font-bold text-slate-900">Importar planilha</h1>
         <p class="text-sm text-slate-500">Logado como <span id="user-email" class="font-medium text-slate-700"></span></p>
+        <p class="text-[11px] text-slate-400 mt-0.5">Importação direta (sem Edge Function / sem CLI)</p>
       </div>
       <div class="flex items-center gap-3">
         <a href="index.html" class="text-sm text-sky-600 hover:underline">Painel</a>
@@ -55,20 +48,16 @@
         <label class="text-xs font-medium text-slate-500 uppercase">Arquivo Excel (.xlsx)</label>
         <input type="file" id="file" accept=".xlsx,.xls" class="mt-2 block w-full text-sm" />
       </div>
-
       <label class="flex items-center gap-2 text-sm text-slate-700">
         <input type="checkbox" id="replace" class="rounded border-slate-300" />
-        Substituir base inteira (apaga lançamentos antes de importar)
+        Substituir base inteira (apaga lançamentos antes)
       </label>
-
       <div class="bg-slate-50 rounded-xl p-3 text-xs text-slate-600">
         <p class="font-semibold text-slate-700 mb-1">Colunas esperadas</p>
         Regional, Loja, Mês, Data, Cod Depto, Depto, Cod Produto, Produto, Cod Dcto, Especie, Real Perda Total Qtde, Real Perda Total R$
       </div>
-
       <div class="bg-amber-50 border border-amber-200 rounded-xl p-3 text-xs text-amber-900">
-        <p class="font-semibold">Checkpoint de auditoria (BI)</p>
-        <p class="mt-1">Ourinhos · ago · Açougue · Inventário</p>
+        <p class="font-semibold">Checkpoint BI — Ourinhos · ago · Açougue · Inventário</p>
         <div class="grid grid-cols-3 gap-2 mt-2">
           <div>
             <label class="text-[10px] uppercase text-amber-700">5201 abs</label>
@@ -84,11 +73,9 @@
           </div>
         </div>
       </div>
-
       <button id="btn-run" disabled class="w-full py-3 text-sm font-semibold rounded-xl bg-sky-600 text-white hover:bg-sky-700 disabled:opacity-40">
         Processar e importar
       </button>
-
       <div id="progress-wrap" class="hidden space-y-2">
         <div class="flex justify-between text-xs text-slate-500">
           <span id="prog-label">Aguardando…</span>
@@ -100,42 +87,36 @@
         <p id="prog-detail" class="text-[11px] text-slate-400"></p>
       </div>
     </div>
-
     <div id="report" class="hidden bg-white rounded-2xl border border-slate-200 shadow-sm p-5 space-y-4"></div>
   </div>
 
 <script>
 (function () {
-  var CHUNK = 400;
+  var CHUNK = 150; // menor: PostgREST direto tolera menos que Edge Function
   var sb = null;
-  var accessToken = null;
+  var DOCS = {
+    '6416': { t: 'N', n: 'S' }, '6417': { t: 'N', n: 'F' },
+    '5200': { t: 'T', n: 'S' }, '5600': { t: 'T', n: 'F' },
+    '5201': { t: 'I', n: 'S' }, '5601': { t: 'I', n: 'F' }
+  };
 
   function $(id) { return document.getElementById(id); }
 
+  function normalizeUrl(u) {
+    u = String(u || '').trim();
+    u = u.replace(/^https:\/\/https:\/\//i, 'https://');
+    u = u.replace(/^https:\/\/https\/\//i, 'https://');
+    u = u.replace(/^https\/\//i, 'https://');
+    u = u.replace(/\/+$/, '');
+    if (u && !/^https?:\/\//i.test(u)) u = 'https://' + u;
+    return u;
+  }
+
   function ensureConfig() {
-    if (!window.SUPABASE_URL || window.SUPABASE_URL.indexOf('SEU_PROJECT') >= 0) {
+    window.SUPABASE_URL = normalizeUrl(window.SUPABASE_URL);
+    if (!window.SUPABASE_URL || /SEU_PROJECT|COLE_AQUI/i.test(window.SUPABASE_URL + (window.SUPABASE_ANON_KEY || ''))) {
       throw new Error('Configure config.js com SUPABASE_URL e SUPABASE_ANON_KEY');
     }
-  }
-
-  function fnUrl(name) {
-    return window.SUPABASE_URL.replace(/\/$/, '') + '/functions/v1/' + name;
-  }
-
-  async function callFn(name, body) {
-    if (!accessToken) throw new Error('Sessão expirada — faça login de novo');
-    var res = await fetch(fnUrl(name), {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'Authorization': 'Bearer ' + accessToken,
-        'apikey': window.SUPABASE_ANON_KEY,
-      },
-      body: JSON.stringify(body),
-    });
-    var json = await res.json().catch(function () { return {}; });
-    if (!res.ok) throw new Error(json.error || ('HTTP ' + res.status));
-    return json;
   }
 
   function setProg(pct, label, detail) {
@@ -151,109 +132,153 @@
     $('panel').classList.remove('hidden');
     $('user-email').textContent = email || '';
   }
-
   function showLogin(msg) {
     $('panel').classList.add('hidden');
     $('login').classList.remove('hidden');
-    accessToken = null;
-    if (msg) {
-      $('login-err').textContent = msg;
-      $('login-err').classList.remove('hidden');
-    }
+    if (msg) { $('login-err').textContent = msg; $('login-err').classList.remove('hidden'); }
   }
 
   async function init() {
     try {
       ensureConfig();
       sb = window.supabase.createClient(window.SUPABASE_URL, window.SUPABASE_ANON_KEY);
-
-      sb.auth.onAuthStateChange(function (event, session) {
-        if (session && session.access_token) {
-          accessToken = session.access_token;
-          showPanel(session.user && session.user.email);
-        } else if (event === 'SIGNED_OUT') {
-          showLogin();
-        }
+      sb.auth.onAuthStateChange(function (ev, session) {
+        if (session) showPanel(session.user && session.user.email);
+        else if (ev === 'SIGNED_OUT') showLogin();
       });
-
-      var sessionRes = await sb.auth.getSession();
-      var session = sessionRes.data && sessionRes.data.session;
-      if (session && session.access_token) {
-        accessToken = session.access_token;
-        showPanel(session.user && session.user.email);
-      }
-    } catch (e) {
-      showLogin(e.message);
-    }
+      var s = await sb.auth.getSession();
+      if (s.data.session) showPanel(s.data.session.user.email);
+    } catch (e) { showLogin(e.message); }
   }
 
   $('btn-login').onclick = async function () {
     $('login-err').classList.add('hidden');
-    var email = $('email').value.trim();
-    var password = $('password').value;
-    if (!email || !password) {
-      $('login-err').textContent = 'Informe e-mail e senha';
-      $('login-err').classList.remove('hidden');
-      return;
-    }
     try {
       ensureConfig();
       if (!sb) sb = window.supabase.createClient(window.SUPABASE_URL, window.SUPABASE_ANON_KEY);
       $('btn-login').disabled = true;
-      $('btn-login').textContent = 'Entrando…';
-      var res = await sb.auth.signInWithPassword({ email: email, password: password });
+      var res = await sb.auth.signInWithPassword({
+        email: $('email').value.trim(),
+        password: $('password').value
+      });
       if (res.error) throw res.error;
-      accessToken = res.data.session.access_token;
       showPanel(res.data.user.email);
     } catch (e) {
       $('login-err').textContent = e.message || 'Falha no login';
       $('login-err').classList.remove('hidden');
     } finally {
       $('btn-login').disabled = false;
-      $('btn-login').textContent = 'Entrar';
     }
   };
-
   $('password').addEventListener('keydown', function (e) {
     if (e.key === 'Enter') $('btn-login').click();
   });
-
   $('btn-logout').onclick = async function () {
     if (sb) await sb.auth.signOut();
     showLogin();
   };
-
   $('file').onchange = function () {
     $('btn-run').disabled = !$('file').files.length;
   };
 
+  // ── helpers parse ──
+  function parseNum(v) {
+    if (v === null || v === undefined || v === '') return null;
+    if (typeof v === 'number' && !isNaN(v)) return v;
+    var s = String(v).trim();
+    if (/^\d{1,3}(\.\d{3})+,\d+$/.test(s)) s = s.replace(/\./g, '').replace(',', '.');
+    else if (s.indexOf(',') >= 0 && s.indexOf('.') < 0) s = s.replace(',', '.');
+    s = s.replace(/[^\d.\-]/g, '');
+    var n = parseFloat(s);
+    return isFinite(n) ? n : null;
+  }
+  function parseDate(v) {
+    if (!v) return null;
+    if (Object.prototype.toString.call(v) === '[object Date]' && !isNaN(v)) {
+      return v.toISOString().slice(0, 10);
+    }
+    var s = String(v).trim();
+    if (/^\d+(\.\d+)?$/.test(s)) {
+      var serial = parseFloat(s);
+      if (serial > 20000 && serial < 80000) {
+        var epoch = new Date(Date.UTC(1899, 11, 30));
+        epoch.setUTCDate(epoch.getUTCDate() + Math.floor(serial));
+        return epoch.toISOString().slice(0, 10);
+      }
+    }
+    var br = s.match(/^(\d{1,2})\/(\d{1,2})\/(\d{4})/);
+    if (br) return br[3] + '-' + br[2].padStart(2, '0') + '-' + br[1].padStart(2, '0');
+    if (/^\d{4}-\d{2}-\d{2}/.test(s)) return s.slice(0, 10);
+    return null;
+  }
+  function normalizeMes(v, dataStr) {
+    var m = String(v || '').toLowerCase().replace('.', '').trim();
+    var map = { janeiro:'jan',fevereiro:'fev',marco:'mar','março':'mar',abril:'abr',maio:'mai',junho:'jun',julho:'jul',agosto:'ago',setembro:'set',outubro:'out',novembro:'nov',dezembro:'dez' };
+    if (map[m]) return map[m];
+    m = m.slice(0, 3);
+    if (['jan','fev','mar','abr','mai','jun','jul','ago','set','out','nov','dez'].indexOf(m) >= 0) return m;
+    if (dataStr) {
+      var mm = parseInt(dataStr.slice(5, 7), 10);
+      return ['jan','fev','mar','abr','mai','jun','jul','ago','set','out','nov','dez'][mm - 1] || '';
+    }
+    return m;
+  }
+  async function shaKey(parts) {
+    var data = new TextEncoder().encode(parts.join('|'));
+    var hash = await crypto.subtle.digest('SHA-256', data);
+    return Array.from(new Uint8Array(hash)).map(function (b) {
+      return b.toString(16).padStart(2, '0');
+    }).join('');
+  }
+  function yieldToUI() { return new Promise(function (r) { setTimeout(r, 0); }); }
+
+  function mapColumns(header) {
+    var aliases = {
+      regional: ['Regional'], loja: ['Loja'], mes: ['Mês', 'Mes'], data: ['Data'],
+      cod_depto: ['Cod Depto', 'Cód Depto'], depto: ['Depto', 'Departamento'],
+      cod_produto: ['Cod Produto', 'Cód Produto'], produto: ['Produto'],
+      cod_dcto: ['Cod Dcto', 'Cód Dcto', 'Cod Documento'],
+      especie: ['Especie', 'Espécie'],
+      qtde: ['Real Perda Total Qtde', 'Qtde', 'Quantidade'],
+      valor: ['Real Perda Total R$', 'Valor', 'Real Perda Total']
+    };
+    var col = {};
+    header.forEach(function (h, i) {
+      Object.keys(aliases).forEach(function (key) {
+        if (aliases[key].some(function (a) { return a.toLowerCase() === h.toLowerCase(); })) col[key] = i;
+      });
+    });
+    return col;
+  }
+
+  // ── import ──
   $('btn-run').onclick = async function () {
     var file = $('file').files[0];
-    if (!file) return;
-
+    if (!file || !sb) return;
     $('btn-run').disabled = true;
     $('report').classList.add('hidden');
-    setProg(1, 'Lendo Excel…', file.name + ' (' + (file.size / 1024 / 1024).toFixed(1) + ' MB)');
+
+    var cacheReg = {}, cacheLoja = {}, cacheDepto = {}, cacheProd = {};
+    var totalIn = 0, totalDup = 0, totalErr = 0;
+    var allErrs = [];
 
     try {
-      // refresh token se necessário
       var sess = await sb.auth.getSession();
       if (!sess.data.session) throw new Error('Sessão expirada — faça login de novo');
-      accessToken = sess.data.session.access_token;
 
+      setProg(2, 'Lendo Excel…', file.name + ' (' + (file.size / 1024 / 1024).toFixed(1) + ' MB)');
       var buf = await file.arrayBuffer();
-      setProg(5, 'Parseando planilha…', 'Arquivos grandes podem demorar alguns minutos');
+      setProg(6, 'Parseando planilha…', 'Aguarde — arquivos grandes demoram');
       await yieldToUI();
 
       var wb = XLSX.read(buf, { type: 'array', cellDates: true, raw: false });
-      var sheet = wb.Sheets[wb.SheetNames[0]];
-      var aoa = XLSX.utils.sheet_to_json(sheet, { header: 1, defval: null, raw: false });
+      var aoa = XLSX.utils.sheet_to_json(wb.Sheets[wb.SheetNames[0]], { header: 1, defval: null, raw: false });
       if (!aoa.length) throw new Error('Planilha vazia');
-
       var header = aoa[0].map(function (h) { return String(h || '').trim(); });
       var col = mapColumns(header);
-      var required = ['regional','loja','data','cod_produto','cod_dcto','qtde','valor'];
-      var missing = required.filter(function (k) { return col[k] === undefined; });
+      var missing = ['regional','loja','data','cod_produto','cod_dcto','qtde','valor'].filter(function (k) {
+        return col[k] === undefined;
+      });
       if (missing.length) throw new Error('Colunas faltando: ' + missing.join(', '));
 
       var dataRows = [];
@@ -261,8 +286,7 @@
         var r = aoa[i];
         if (!r || !r.length) continue;
         dataRows.push({
-          regional: r[col.regional],
-          loja: r[col.loja],
+          regional: r[col.regional], loja: r[col.loja],
           mes: col.mes !== undefined ? r[col.mes] : null,
           data: r[col.data],
           cod_depto: col.cod_depto !== undefined ? r[col.cod_depto] : null,
@@ -271,114 +295,213 @@
           produto: col.produto !== undefined ? r[col.produto] : null,
           cod_dcto: r[col.cod_dcto],
           especie: col.especie !== undefined ? r[col.especie] : null,
-          qtde: r[col.qtde],
-          valor: r[col.valor],
+          qtde: r[col.qtde], valor: r[col.valor],
+          _line: i + 1
         });
       }
 
-      setProg(12, 'Iniciando lote…', dataRows.length.toLocaleString('pt-BR') + ' linhas lidas');
+      setProg(10, 'Preparando lote…', dataRows.length.toLocaleString('pt-BR') + ' linhas');
 
-      var start = await callFn('import-start', {
+      if ($('replace').checked) {
+        setProg(11, 'Limpando base…', '');
+        var clr = await sb.rpc('admin_clear_lancamentos');
+        if (clr.error) throw clr.error;
+      }
+
+      var batchIns = await sb.from('import_batches').insert({
         filename: file.name,
-        replace_all: $('replace').checked,
-      });
-      var batchId = start.batch_id;
+        total_linhas: 0, inseridos: 0, duplicados: 0, erros: 0, erros_detalhe: [],
+        created_by: sess.data.session.user.email
+      }).select('id').single();
+      if (batchIns.error) throw batchIns.error;
+      var batchId = batchIns.data.id;
 
-      var totalIn = 0, totalDup = 0, totalErr = 0;
-      var allErrs = [];
+      async function getReg(nome) {
+        if (cacheReg[nome]) return cacheReg[nome];
+        var res = await sb.rpc('upsert_regional', { p_nome: nome });
+        if (res.error) throw res.error;
+        cacheReg[nome] = res.data;
+        return res.data;
+      }
+      async function getLoja(nome, regId) {
+        var k = nome + '|' + regId;
+        if (cacheLoja[k]) return cacheLoja[k];
+        var res = await sb.rpc('upsert_loja', { p_nome: nome, p_regional_id: regId });
+        if (res.error) throw res.error;
+        cacheLoja[k] = res.data;
+        return res.data;
+      }
+      async function getDepto(cod, nome) {
+        if (cacheDepto[nome]) return cacheDepto[nome];
+        var res = await sb.rpc('upsert_depto', { p_codigo: cod || null, p_nome: nome });
+        if (res.error) throw res.error;
+        cacheDepto[nome] = res.data;
+        return res.data;
+      }
+      async function getProd(cod, nome, deptoId) {
+        if (cacheProd[cod]) return cacheProd[cod];
+        var res = await sb.rpc('upsert_produto', { p_codigo: cod, p_nome: nome, p_depto_id: deptoId });
+        if (res.error) throw res.error;
+        cacheProd[cod] = res.data;
+        return res.data;
+      }
+
       var totalChunks = Math.ceil(dataRows.length / CHUNK) || 1;
 
       for (var c = 0; c < totalChunks; c++) {
-        // refresh token mid-import for long jobs
-        if (c % 25 === 0) {
-          var s2 = await sb.auth.getSession();
-          if (s2.data.session) accessToken = s2.data.session.access_token;
-        }
         var slice = dataRows.slice(c * CHUNK, (c + 1) * CHUNK);
-        var pct = 12 + (c / totalChunks) * 78;
-        setProg(pct, 'Enviando lote ' + (c + 1) + ' / ' + totalChunks,
+        var toInsert = [];
+
+        for (var j = 0; j < slice.length; j++) {
+          var row = slice[j];
+          try {
+            var codDcto = String(row.cod_dcto ?? '').trim();
+            var doc = DOCS[codDcto];
+            if (!doc) {
+              totalErr++;
+              if (allErrs.length < 50) allErrs.push('L' + row._line + ': Cod Dcto ' + codDcto + ' não reconhecido');
+              continue;
+            }
+            var valorOrig = parseNum(row.valor);
+            var qtdeOrig = parseNum(row.qtde);
+            if (valorOrig === null || qtdeOrig === null) {
+              totalErr++;
+              if (allErrs.length < 50) allErrs.push('L' + row._line + ': valor/qtde inválidos');
+              continue;
+            }
+            var dataStr = parseDate(row.data);
+            if (!dataStr) {
+              totalErr++;
+              if (allErrs.length < 50) allErrs.push('L' + row._line + ': data inválida');
+              continue;
+            }
+            var regional = String(row.regional || '').trim();
+            var loja = String(row.loja || '').trim();
+            var depto = String(row.depto || '').trim();
+            var codProd = String(row.cod_produto ?? '').trim();
+            var produto = String(row.produto || '').trim();
+            if (!regional || !loja || !depto || !codProd) {
+              totalErr++;
+              if (allErrs.length < 50) allErrs.push('L' + row._line + ': campos obrigatórios vazios');
+              continue;
+            }
+            var mes = normalizeMes(row.mes, dataStr);
+            var absV = Math.abs(valorOrig);
+            var absQ = Math.abs(qtdeOrig);
+            var valorAp = doc.n === 'F' ? -absV : absV;
+            var qtdeAp = doc.n === 'F' ? -absQ : absQ;
+            var chave = await shaKey([regional, loja, dataStr, codProd, codDcto, String(qtdeOrig), String(valorOrig)]);
+
+            var regId = await getReg(regional);
+            var lojaId = await getLoja(loja, regId);
+            var deptoId = await getDepto(String(row.cod_depto || ''), depto);
+            var prodId = await getProd(codProd, produto || codProd, deptoId);
+
+            toInsert.push({
+              chave_unica: chave,
+              regional_id: regId,
+              loja_id: lojaId,
+              departamento_id: deptoId,
+              produto_id: prodId,
+              mes: mes,
+              data: dataStr,
+              cod_dcto: codDcto,
+              tipo_codigo: doc.t,
+              natureza_codigo: doc.n,
+              especie: row.especie ? String(row.especie) : null,
+              quantidade_original: qtdeOrig,
+              valor_original: valorOrig,
+              quantidade_apresentacao: Math.round(qtdeAp * 10000) / 10000,
+              valor_apresentacao: Math.round(valorAp * 100) / 100,
+              import_batch_id: batchId
+            });
+          } catch (e) {
+            totalErr++;
+            if (allErrs.length < 50) allErrs.push('L' + row._line + ': ' + (e.message || e));
+          }
+        }
+
+        if (toInsert.length) {
+          var ins = await sb.from('lancamentos').upsert(toInsert, {
+            onConflict: 'chave_unica',
+            ignoreDuplicates: true
+          }).select('id');
+
+          if (ins.error) {
+            // tenta um a um
+            for (var k = 0; k < toInsert.length; k++) {
+              var one = await sb.from('lancamentos').insert(toInsert[k]).select('id');
+              if (one.error) {
+                if (String(one.error.message || '').indexOf('duplicate') >= 0 || one.error.code === '23505') totalDup++;
+                else {
+                  totalErr++;
+                  if (allErrs.length < 50) allErrs.push(one.error.message);
+                }
+              } else totalIn++;
+            }
+          } else {
+            var got = (ins.data && ins.data.length) || 0;
+            totalIn += got;
+            totalDup += toInsert.length - got;
+          }
+        }
+
+        var pct = 12 + ((c + 1) / totalChunks) * 80;
+        setProg(pct, 'Gravando lote ' + (c + 1) + ' / ' + totalChunks,
           'Inseridos ' + totalIn.toLocaleString('pt-BR') +
           ' · Dups ' + totalDup.toLocaleString('pt-BR') +
           ' · Erros ' + totalErr.toLocaleString('pt-BR'));
-
-        var result = await callFn('import-chunk', {
-          batch_id: batchId,
-          offset: c * CHUNK,
-          rows: slice,
-        });
-        totalIn += result.inseridos || 0;
-        totalDup += result.duplicados || 0;
-        totalErr += result.erros || 0;
-        if (result.erros_detalhe) allErrs = allErrs.concat(result.erros_detalhe).slice(0, 80);
         await yieldToUI();
       }
 
-      setProg(93, 'Gerando auditoria vs BI…', '');
-
-      var finish = await callFn('import-finish', {
-        batch_id: batchId,
-        checkpoints: [{
-          nome: 'Ourinhos · ago · Açougue (Inventário 5201/5601)',
-          p_loja: 'Ourinhos',
-          p_mes: 'ago',
-          p_depto: 'Açougue',
-          esperado: {
-            '5201_abs': Number($('exp-5201').value),
-            '5601_abs': Number($('exp-5601').value),
-            resultado_inv: Number($('exp-res').value),
-          },
-        }],
-      });
-
-      setProg(100, 'Concluído', '');
-      renderReport({
-        file: file.name,
-        lidas: dataRows.length,
+      await sb.from('import_batches').update({
+        total_linhas: dataRows.length,
         inseridos: totalIn,
         duplicados: totalDup,
         erros: totalErr,
-        erros_detalhe: allErrs,
-        finish: finish,
+        erros_detalhe: allErrs
+      }).eq('id', batchId);
+
+      setProg(95, 'Auditoria vs BI…', '');
+      var aud = await sb.rpc('api_auditoria', {
+        p_loja: 'Ourinhos',
+        p_mes: 'ago',
+        p_depto: 'Açougue'
+      });
+      if (aud.error) throw aud.error;
+
+      var porDoc = (aud.data && aud.data.por_documento) || [];
+      var d5201 = porDoc.find(function (d) { return d.cod_dcto === '5201'; }) || {};
+      var d5601 = porDoc.find(function (d) { return d.cod_dcto === '5601'; }) || {};
+      var abs5201 = Number(d5201.soma_abs || 0);
+      var abs5601 = Number(d5601.soma_abs || 0);
+      var resInv = Number(d5201.soma_apresentacao || 0) + Number(d5601.soma_apresentacao || 0);
+      var exp5201 = Number($('exp-5201').value);
+      var exp5601 = Number($('exp-5601').value);
+      var expRes = Number($('exp-res').value);
+      var checks = [
+        { campo: '5201 soma abs', esperado: exp5201, obtido: abs5201, ok: Math.abs(abs5201 - exp5201) < 1 },
+        { campo: '5601 soma abs', esperado: exp5601, obtido: abs5601, ok: Math.abs(abs5601 - exp5601) < 1 },
+        { campo: 'Resultado inventário', esperado: expRes, obtido: Math.round(resInv * 100) / 100, ok: Math.abs(resInv - expRes) < 1 }
+      ];
+      var aprovado = checks.every(function (c) { return c.ok; });
+
+      setProg(100, 'Concluído', '');
+      renderReport({
+        lidas: dataRows.length, inseridos: totalIn, duplicados: totalDup, erros: totalErr,
+        erros_detalhe: allErrs, file: file.name,
+        por_documento: porDoc, checks: checks, aprovado: aprovado,
+        resultado_inv: Math.round(resInv * 100) / 100
       });
     } catch (err) {
       console.error(err);
       setProg(0, 'Erro', '');
-      alert('Falha na importação: ' + err.message);
-      if (/autenticado|Sessão|401/i.test(err.message)) showLogin(err.message);
+      alert('Falha na importação: ' + (err.message || err));
+      if (/autenticado|JWT|session|login/i.test(String(err.message || ''))) showLogin(err.message);
     } finally {
       $('btn-run').disabled = false;
     }
   };
-
-  function mapColumns(header) {
-    var aliases = {
-      regional: ['Regional'],
-      loja: ['Loja'],
-      mes: ['Mês', 'Mes'],
-      data: ['Data'],
-      cod_depto: ['Cod Depto', 'Cód Depto', 'Cod Depto.'],
-      depto: ['Depto', 'Departamento'],
-      cod_produto: ['Cod Produto', 'Cód Produto', 'Cod. Produto'],
-      produto: ['Produto'],
-      cod_dcto: ['Cod Dcto', 'Cód Dcto', 'Cod. Dcto', 'Cod Documento'],
-      especie: ['Especie', 'Espécie'],
-      qtde: ['Real Perda Total Qtde', 'Real Perda Total Qtde.', 'Qtde', 'Quantidade'],
-      valor: ['Real Perda Total R$', 'Valor', 'Real Perda Total'],
-    };
-    var col = {};
-    header.forEach(function (h, i) {
-      Object.keys(aliases).forEach(function (key) {
-        if (aliases[key].some(function (a) { return a.toLowerCase() === h.toLowerCase(); })) {
-          col[key] = i;
-        }
-      });
-    });
-    return col;
-  }
-
-  function yieldToUI() {
-    return new Promise(function (r) { setTimeout(r, 0); });
-  }
 
   function fmt(n) {
     return Number(n).toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
@@ -387,32 +510,23 @@
   function renderReport(info) {
     var box = $('report');
     box.classList.remove('hidden');
-    var cp = (info.finish.checkpoints && info.finish.checkpoints[0]) || {};
-    var checks = cp.checks || [];
-    var aprovado = cp.aprovado;
+    var statusCls = info.aprovado ? 'bg-emerald-50 border-emerald-200 text-emerald-800' : 'bg-red-50 border-red-200 text-red-800';
+    var statusTxt = info.aprovado ? 'Checkpoint BI APROVADO' : 'Checkpoint BI REPROVADO';
 
-    var checksHtml = checks.map(function (c) {
-      var icon = c.ok ? '✅' : '❌';
-      return '<tr class="border-t border-slate-100">' +
-        '<td class="py-1.5 text-sm">' + icon + ' ' + c.campo + '</td>' +
-        '<td class="py-1.5 text-sm text-right tabular-nums">' + fmt(c.esperado) + '</td>' +
-        '<td class="py-1.5 text-sm text-right tabular-nums font-semibold">' + fmt(c.obtido) + '</td></tr>';
+    var checksHtml = info.checks.map(function (c) {
+      return '<tr class="border-t border-slate-100"><td class="py-1.5 text-sm">' + (c.ok ? '✅' : '❌') + ' ' + c.campo +
+        '</td><td class="py-1.5 text-sm text-right tabular-nums">' + fmt(c.esperado) +
+        '</td><td class="py-1.5 text-sm text-right tabular-nums font-semibold">' + fmt(c.obtido) + '</td></tr>';
     }).join('');
 
-    var docs = ((cp.auditoria && cp.auditoria.por_documento) || []).map(function (d) {
-      return '<tr class="border-t border-slate-100">' +
-        '<td class="py-1.5 text-sm font-medium">' + d.cod_dcto + '</td>' +
-        '<td class="py-1.5 text-xs">' + d.natureza + '</td>' +
-        '<td class="py-1.5 text-sm text-right">' + d.qtd_linhas + '</td>' +
-        '<td class="py-1.5 text-sm text-right tabular-nums">' + fmt(d.soma_original) + '</td>' +
-        '<td class="py-1.5 text-sm text-right tabular-nums">' + fmt(d.soma_abs) + '</td>' +
-        '<td class="py-1.5 text-sm text-right tabular-nums font-semibold">' + fmt(d.soma_apresentacao) + '</td></tr>';
+    var docs = (info.por_documento || []).map(function (d) {
+      return '<tr class="border-t border-slate-100"><td class="py-1.5 text-sm font-medium">' + d.cod_dcto +
+        '</td><td class="py-1.5 text-xs">' + d.natureza +
+        '</td><td class="py-1.5 text-sm text-right">' + d.qtd_linhas +
+        '</td><td class="py-1.5 text-sm text-right tabular-nums">' + fmt(d.soma_original) +
+        '</td><td class="py-1.5 text-sm text-right tabular-nums">' + fmt(d.soma_abs) +
+        '</td><td class="py-1.5 text-sm text-right tabular-nums font-semibold">' + fmt(d.soma_apresentacao) + '</td></tr>';
     }).join('');
-
-    var statusCls = aprovado === true ? 'bg-emerald-50 border-emerald-200 text-emerald-800' :
-      aprovado === false ? 'bg-red-50 border-red-200 text-red-800' : 'bg-slate-50 border-slate-200 text-slate-700';
-    var statusTxt = aprovado === true ? 'Checkpoint BI APROVADO' :
-      aprovado === false ? 'Checkpoint BI REPROVADO — confira os valores' : 'Sem checkpoint';
 
     box.innerHTML =
       '<div class="rounded-xl border p-4 ' + statusCls + '"><p class="font-bold">' + statusTxt + '</p></div>' +
@@ -422,14 +536,14 @@
       '<div class="rounded-xl bg-amber-50 p-3"><p class="text-[10px] uppercase text-amber-600">Duplicadas</p><p class="text-lg font-bold text-amber-700">' + info.duplicados.toLocaleString('pt-BR') + '</p></div>' +
       '<div class="rounded-xl bg-red-50 p-3"><p class="text-[10px] uppercase text-red-600">Erros</p><p class="text-lg font-bold text-red-700">' + info.erros.toLocaleString('pt-BR') + '</p></div>' +
       '</div>' +
-      '<div><h3 class="text-sm font-semibold text-slate-800 mb-2">Checkpoint: ' + (cp.nome || '') + '</h3>' +
-      '<table class="w-full text-left"><thead><tr class="text-[10px] uppercase text-slate-400"><th class="pb-1">Check</th><th class="pb-1 text-right">Esperado (BI)</th><th class="pb-1 text-right">Obtido</th></tr></thead><tbody>' + checksHtml + '</tbody></table></div>' +
-      '<div><h3 class="text-sm font-semibold text-slate-800 mb-2">Por documento (filtro do checkpoint)</h3>' +
-      '<div class="overflow-x-auto"><table class="w-full text-left min-w-[520px]"><thead><tr class="text-[10px] uppercase text-slate-400">' +
-      '<th class="pb-1">Cod</th><th class="pb-1">Nat.</th><th class="pb-1 text-right">Linhas</th><th class="pb-1 text-right">Σ original</th><th class="pb-1 text-right">Σ abs</th><th class="pb-1 text-right">Σ apresentação</th>' +
+      '<div><h3 class="text-sm font-semibold mb-2">Checkpoint Ourinhos · ago · Açougue</h3>' +
+      '<table class="w-full"><thead><tr class="text-[10px] uppercase text-slate-400"><th class="pb-1 text-left">Check</th><th class="pb-1 text-right">Esperado</th><th class="pb-1 text-right">Obtido</th></tr></thead><tbody>' + checksHtml + '</tbody></table></div>' +
+      '<div><h3 class="text-sm font-semibold mb-2">Por documento</h3>' +
+      '<div class="overflow-x-auto"><table class="w-full min-w-[520px]"><thead><tr class="text-[10px] uppercase text-slate-400">' +
+      '<th class="pb-1 text-left">Cod</th><th class="pb-1">Nat.</th><th class="pb-1 text-right">Linhas</th><th class="pb-1 text-right">Σ original</th><th class="pb-1 text-right">Σ abs</th><th class="pb-1 text-right">Σ apresentação</th>' +
       '</tr></thead><tbody>' + docs + '</tbody></table></div></div>' +
-      (info.erros_detalhe.length ? '<details class="text-xs"><summary class="cursor-pointer text-slate-500">Erros (' + info.erros_detalhe.length + ')</summary><pre class="mt-2 p-2 bg-slate-50 rounded-lg overflow-auto max-h-40">' + info.erros_detalhe.join('\n') + '</pre></details>' : '') +
-      '<p class="text-xs text-slate-500">Arquivo: ' + info.file + ' · <a class="text-sky-600 underline" href="index.html">Abrir painel</a></p>';
+      (info.erros_detalhe.length ? '<details class="text-xs"><summary class="cursor-pointer text-slate-500">Erros</summary><pre class="mt-2 p-2 bg-slate-50 rounded-lg max-h-40 overflow-auto">' + info.erros_detalhe.join('\n') + '</pre></details>' : '') +
+      '<p class="text-xs text-slate-500">Arquivo: ' + info.file + ' · <a href="index.html" class="text-sky-600 underline">Abrir painel</a></p>';
   }
 
   init();

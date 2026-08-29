@@ -69,7 +69,14 @@
 
   // ── Init ──
   async function init() {
-    if (!window.SUPABASE_URL || window.SUPABASE_URL.indexOf('SEU_PROJECT') >= 0) {
+    var u = String(window.SUPABASE_URL || '').trim()
+      .replace(/^https:\/\/https:\/\//i, 'https://')
+      .replace(/^https:\/\/https\/\//i, 'https://')
+      .replace(/^https\/\//i, 'https://')
+      .replace(/\/+$/, '');
+    if (u && !/^https?:\/\//i.test(u)) u = 'https://' + u;
+    window.SUPABASE_URL = u;
+    if (!u || /SEU_PROJECT|COLE_AQUI/i.test(u + (window.SUPABASE_ANON_KEY || ''))) {
       el('load-pct').innerHTML = 'Configure <code>config.js</code> com a URL e a anon key do Supabase.';
       return;
     }
