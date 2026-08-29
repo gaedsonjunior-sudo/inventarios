@@ -141,7 +141,7 @@
       </div>
     </section>
 
-    <section class="bg-white rounded-2xl border border-slate-200 p-3 sm:p-4 shadow-sm">
+    <section id="section-evolucao-chart" class="hidden" aria-hidden="true" >
       <div class="flex items-center justify-between mb-2 sm:mb-3 gap-2 flex-wrap">
         <h2 class="text-sm font-semibold text-slate-800">Evolução Mensal</h2>
         <div class="flex flex-wrap gap-1">
@@ -152,6 +152,34 @@
         </div>
       </div>
       <div class="h-48 sm:h-52 lg:h-60"><canvas id="chart-evolucao"></canvas></div>
+    </section>
+
+    <section class="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden">
+      <div class="px-3 sm:px-4 py-2 sm:py-3 border-b border-slate-100 flex items-center justify-between gap-2">
+        <h2 class="text-sm font-semibold text-slate-800">Regionais</h2>
+        <div class="flex items-center gap-2">
+          <select id="sort-regionais" class="text-[11px] border border-slate-200 rounded-lg px-2 py-1 bg-white">
+            <option value="total_asc">Pior total</option>
+            <option value="total_desc">Melhor total</option>
+            <option value="nome">Nome</option>
+          </select>
+          <button id="btn-expand-regionais" class="text-[11px] text-brand-600 hover:text-brand-700 font-medium">Ver tudo</button>
+        </div>
+      </div>
+      <div class="px-2 sm:px-3 py-2 overflow-x-auto">
+        <table class="rank-table w-full text-left">
+              <thead>
+                <tr class="text-[10px] text-slate-400 uppercase sticky top-0 bg-white">
+                  <th class="pb-2 font-medium pl-1 col-name">Regional</th>
+                  <th class="pb-2 font-medium col-val">Normal</th>
+                  <th class="pb-2 font-medium col-val">TOP20</th>
+                  <th class="pb-2 font-medium col-val">Inv.</th>
+                  <th class="pb-2 font-medium col-val">Total</th>
+            </tr>
+          </thead>
+          <tbody id="rank-regionais"></tbody>
+        </table>
+      </div>
     </section>
 
     <div class="grid grid-cols-1 lg:grid-cols-2 gap-3 sm:gap-4">
@@ -217,38 +245,9 @@
     </div>
 
     <section class="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden">
-      <div class="px-3 sm:px-4 py-2 sm:py-3 border-b border-slate-100 flex items-center justify-between gap-2">
-        <h2 class="text-sm font-semibold text-slate-800">Regionais</h2>
-        <div class="flex items-center gap-2">
-          <select id="sort-regionais" class="text-[11px] border border-slate-200 rounded-lg px-2 py-1 bg-white">
-            <option value="total_asc">Pior total</option>
-            <option value="total_desc">Melhor total</option>
-            <option value="nome">Nome</option>
-          </select>
-          <button id="btn-expand-regionais" class="text-[11px] text-brand-600 hover:text-brand-700 font-medium">Ver tudo</button>
-        </div>
-      </div>
-      <div class="px-2 sm:px-3 py-2 overflow-x-auto">
-        <table class="rank-table w-full text-left">
-              <thead>
-                <tr class="text-[10px] text-slate-400 uppercase sticky top-0 bg-white">
-                  <th class="pb-2 font-medium pl-1 col-name">Regional</th>
-                  <th class="pb-2 font-medium col-val">Normal</th>
-                  <th class="pb-2 font-medium col-val">TOP20</th>
-                  <th class="pb-2 font-medium col-val">Inv.</th>
-                  <th class="pb-2 font-medium col-val">Total</th>
-            </tr>
-          </thead>
-          <tbody id="rank-regionais"></tbody>
-        </table>
-      </div>
-    </section>
-
-    
-    <section class="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden">
       <div class="px-3 sm:px-4 py-2 sm:py-3 border-b border-slate-100 flex flex-wrap items-center justify-between gap-2">
         <div>
-          <h2 class="text-sm font-semibold text-slate-800">Lojas × Meses</h2>
+          <h2 class="text-sm font-semibold text-slate-800">Evolução Mensal - Lojas</h2>
         </div>
         <div class="flex flex-wrap items-center gap-1.5">
           <div class="flex flex-wrap gap-1">
@@ -276,7 +275,7 @@
     <section class="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden">
       <div class="px-3 sm:px-4 py-2 sm:py-3 border-b border-slate-100 flex flex-wrap items-center justify-between gap-2">
         <div>
-          <h2 class="text-sm font-semibold text-slate-800">Departamentos × Meses</h2>
+          <h2 class="text-sm font-semibold text-slate-800">Evolução Mensal - Departamentos</h2>
         </div>
         <div class="flex flex-wrap items-center gap-1.5">
           <div class="flex flex-wrap gap-1">
@@ -300,9 +299,7 @@
       </div>
     </section>
 
-
-
-<div class="grid grid-cols-1 lg:grid-cols-2 gap-3 sm:gap-4">
+    <div class="grid grid-cols-1 lg:grid-cols-2 gap-3 sm:gap-4">
       <section class="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden">
         <div class="px-3 sm:px-4 py-2 sm:py-3 border-b border-slate-100 flex items-center justify-between gap-2">
           <h2 class="text-sm font-semibold text-falta">Maiores Faltas</h2>
@@ -328,6 +325,11 @@
         <div id="rank-sobras" class="divide-y divide-slate-50 max-h-80 overflow-y-auto scrollbar-thin"></div>
       </section>
     </div>
+
+    <footer class="py-6 sm:py-8 text-center">
+      <p class="text-[11px] sm:text-xs text-slate-400">Desenvolvido por Edson Pinheiro</p>
+    </footer>
+
 
   </main>
 
