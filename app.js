@@ -89,11 +89,7 @@
     try {
       META = await rpc('api_meta');
       initFilters();
-      if (el('header-sub')) {
-        el('header-sub').textContent =
-          (META.total || 0).toLocaleString('pt-BR') + ' lançamentos · ' +
-          (META.data_min || '') + ' a ' + (META.data_max || '');
-      }
+      if (el('header-sub')) el('header-sub').textContent = '';
       setAtualizado();
       await refreshAll();
     } catch (err) {
