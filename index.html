@@ -24,8 +24,25 @@
   </script>
   <style>
     body { font-family: Inter, system-ui, sans-serif; }
-    .scrollbar-thin::-webkit-scrollbar { width: 5px; height: 5px; }
-    .scrollbar-thin::-webkit-scrollbar-thumb { background: #cbd5e1; border-radius: 3px; }
+    .scrollbar-thin::-webkit-scrollbar { width: 3px; height: 3px; }
+    .scrollbar-thin::-webkit-scrollbar-track { background: transparent; }
+    .scrollbar-thin::-webkit-scrollbar-thumb { background: #e2e8f0; border-radius: 99px; }
+    .scrollbar-thin::-webkit-scrollbar-thumb:hover { background: #cbd5e1; }
+    .scrollbar-thin { scrollbar-width: thin; scrollbar-color: #e2e8f0 transparent; }
+    /* colunas de valor: cabeçalho e número no mesmo eixo */
+    table.rank-table th.col-val,
+    table.rank-table td.col-val {
+      text-align: center;
+      width: 1%;
+      white-space: nowrap;
+      padding-left: 0.5rem;
+      padding-right: 0.5rem;
+    }
+    table.rank-table th.col-name,
+    table.rank-table td.col-name {
+      text-align: left;
+      white-space: nowrap;
+    }
     .drawer { transform: translateX(100%); transition: transform .3s ease; }
     .drawer.open { transform: translateX(0); }
     .spinner { border: 3px solid #e2e8f0; border-top-color: #0ea5e9; border-radius: 50%; width: 40px; height: 40px; animation: spin .8s linear infinite; }
@@ -114,14 +131,14 @@
         </div>
         <div class="px-2 sm:px-3 py-2">
           <div class="overflow-x-auto overflow-y-auto scrollbar-thin" style="max-height: 320px;">
-            <table class="w-full text-left min-w-[380px] sm:min-w-[480px]">
+            <table class="rank-table w-full text-left">
               <thead>
                 <tr class="text-[10px] text-slate-400 uppercase sticky top-0 bg-white">
-                  <th class="pb-2 font-medium pl-1 text-left">Loja</th>
-                  <th class="pb-2 font-medium text-center">Normal</th>
-                  <th class="pb-2 font-medium text-center">TOP20</th>
-                  <th class="pb-2 font-medium text-center">Inv.</th>
-                  <th class="pb-2 font-medium text-center pr-1">Total</th>
+                  <th class="pb-2 font-medium pl-1 col-name">Loja</th>
+                  <th class="pb-2 font-medium col-val">Normal</th>
+                  <th class="pb-2 font-medium col-val">TOP20</th>
+                  <th class="pb-2 font-medium col-val">Inv.</th>
+                  <th class="pb-2 font-medium col-val">Total</th>
                 </tr>
               </thead>
               <tbody id="rank-lojas"></tbody>
@@ -144,14 +161,14 @@
         </div>
         <div class="px-2 sm:px-3 py-2">
           <div class="overflow-x-auto overflow-y-auto scrollbar-thin" style="max-height: 320px;">
-            <table class="w-full text-left min-w-[360px] sm:min-w-[420px]">
+            <table class="rank-table w-full text-left">
               <thead>
                 <tr class="text-[10px] text-slate-400 uppercase sticky top-0 bg-white">
-                  <th class="pb-2 font-medium pl-1 text-left">Depto</th>
-                  <th class="pb-2 font-medium text-center">Normal</th>
-                  <th class="pb-2 font-medium text-center">TOP20</th>
-                  <th class="pb-2 font-medium text-center">Inv.</th>
-                  <th class="pb-2 font-medium text-center pr-1">Total</th>
+                  <th class="pb-2 font-medium pl-1 col-name">Depto</th>
+                  <th class="pb-2 font-medium col-val">Normal</th>
+                  <th class="pb-2 font-medium col-val">TOP20</th>
+                  <th class="pb-2 font-medium col-val">Inv.</th>
+                  <th class="pb-2 font-medium col-val">Total</th>
                 </tr>
               </thead>
               <tbody id="rank-deptos"></tbody>
@@ -174,14 +191,14 @@
         </div>
       </div>
       <div class="px-2 sm:px-3 py-2 overflow-x-auto">
-        <table class="w-full text-left min-w-[380px] sm:min-w-[480px]">
-          <thead>
-            <tr class="text-[10px] text-slate-400 uppercase">
-              <th class="pb-2 font-medium pl-1 text-left">Regional</th>
-              <th class="pb-2 font-medium text-center">Normal</th>
-              <th class="pb-2 font-medium text-center">TOP20</th>
-              <th class="pb-2 font-medium text-center">Inv.</th>
-              <th class="pb-2 font-medium text-center pr-1">Total</th>
+        <table class="rank-table w-full text-left">
+              <thead>
+                <tr class="text-[10px] text-slate-400 uppercase sticky top-0 bg-white">
+                  <th class="pb-2 font-medium pl-1 col-name">Regional</th>
+                  <th class="pb-2 font-medium col-val">Normal</th>
+                  <th class="pb-2 font-medium col-val">TOP20</th>
+                  <th class="pb-2 font-medium col-val">Inv.</th>
+                  <th class="pb-2 font-medium col-val">Total</th>
             </tr>
           </thead>
           <tbody id="rank-regionais"></tbody>

@@ -292,13 +292,13 @@
   }
 
   function cellMoney(v) {
-    return '<td class="py-2 text-right tabular-nums text-sm ' + moneyClass(v) + '">' + fmtMoney(v) + '</td>';
+    return '<td class="py-2 tabular-nums text-sm col-val ' + moneyClass(v) + '">' + fmtMoney(v) + '</td>';
   }
 
   function rankingRows(list, nameKey, dataAttr) {
     return (list || []).map(function (row) {
       return '<tr class="border-t border-slate-50 hover:bg-slate-50 cursor-pointer" ' + dataAttr + '="' + row[nameKey] + '">' +
-        '<td class="py-2 pl-1 text-sm font-medium text-slate-800 text-left">' + row[nameKey] + '</td>' +
+        '<td class="py-2 pl-1 text-sm font-medium text-slate-800 col-name">' + row[nameKey] + '</td>' +
         cellMoney(row.N) + cellMoney(row.T) + cellMoney(row.I) + cellMoney(row.total) +
         '</tr>';
     }).join('');
@@ -515,13 +515,13 @@
   }
 
   function tableHtml(list, nameKey, nameLabel) {
-    return '<div class="overflow-x-auto"><table class="w-full text-left min-w-[480px]">' +
+    return '<div class="overflow-x-auto scrollbar-thin"><table class="rank-table w-full text-left">' +
       '<thead><tr class="text-[10px] text-slate-400 uppercase">' +
-      '<th class="pb-2 font-medium text-left">' + nameLabel + '</th>' +
-      '<th class="pb-2 font-medium text-center">Normal</th>' +
-      '<th class="pb-2 font-medium text-center">TOP20</th>' +
-      '<th class="pb-2 font-medium text-center">Inv.</th>' +
-      '<th class="pb-2 font-medium text-center">Total</th>' +
+      '<th class="pb-2 font-medium col-name">' + nameLabel + '</th>' +
+      '<th class="pb-2 font-medium col-val">Normal</th>' +
+      '<th class="pb-2 font-medium col-val">TOP20</th>' +
+      '<th class="pb-2 font-medium col-val">Inv.</th>' +
+      '<th class="pb-2 font-medium col-val">Total</th>' +
       '</tr></thead><tbody>' +
       rankingRows(list, nameKey, 'data-x') +
       '</tbody></table></div>';
