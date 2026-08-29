@@ -21,20 +21,21 @@
     Chart.register(ChartDataLabels);
   }
 
+  // Formato mobile-first: inteiro, ponto de milhar, SEM sinal, SEM casas decimais
+  // Ex.: -8262234.94 → "8.262.235" (vermelho via moneyClass)
   function fmt(n, dec) {
-    dec = dec === undefined ? 2 : dec;
-    return Number(n || 0).toLocaleString('pt-BR', { minimumFractionDigits: dec, maximumFractionDigits: dec });
+    var v = Math.round(Number(n || 0));
+    return Math.abs(v).toLocaleString('pt-BR', { maximumFractionDigits: 0 });
   }
   function fmtMoney(n) {
-    var v = Number(n || 0);
-    var s = v.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
-    return (v > 0 ? '+' : '') + s;
+    var v = Math.round(Number(n || 0));
+    return Math.abs(v).toLocaleString('pt-BR', { maximumFractionDigits: 0 });
   }
   function moneyClass(n) {
     var v = Number(n || 0);
-    if (v < 0) return 'text-falta';
-    if (v > 0) return 'text-sobra';
-    return 'text-slate-700';
+    if (v < -0.5) return 'text-falta font-medium';
+    if (v > 0.5) return 'text-sobra font-medium';
+    return 'text-slate-600';
   }
   function el(id) { return document.getElementById(id); }
 
@@ -473,21 +474,20 @@
     var linhas = (data && data.linhas) || [];
     head.innerHTML = '<th class="pb-2 font-medium pl-1 text-left sticky left-0 bg-white z-10">Loja</th>' +
       meses.map(function (m) {
-        return '<th class="pb-2 font-medium text-center px-1">' + m + '</th>';
-      }).join('') +
-      '<th class="pb-2 font-medium text-center pr-1">Total</th>';
+        var label = m ? (m.charAt(0).toUpperCase() + m.slice(1)) : m;
+        return '<th class="pb-2 font-medium text-center px-1.5 whitespace-nowrap">' + label + '</th>';
+      }).join('');
 
     body.innerHTML = linhas.map(function (row) {
       var por = row.por_mes || {};
       return '<tr class="border-t border-slate-50">' +
-        '<td class="py-2 pl-1 text-sm font-medium text-slate-800 sticky left-0 bg-white">' + row.loja + '</td>' +
+        '<td class="py-1.5 pl-1 pr-2 text-sm font-medium text-slate-800 sticky left-0 bg-white whitespace-nowrap">' + row.loja + '</td>' +
         meses.map(function (m) {
           var v = por[m] != null ? Number(por[m]) : 0;
-          return '<td class="py-2 text-center tabular-nums text-xs ' + moneyClass(v) + '">' + (v ? fmtMoney(v) : '—') + '</td>';
+          return '<td class="py-1.5 px-1.5 text-center tabular-nums text-xs whitespace-nowrap ' + moneyClass(v) + '">' + fmtMoney(v) + '</td>';
         }).join('') +
-        '<td class="py-2 text-center tabular-nums text-sm font-semibold ' + moneyClass(row.total) + '">' + fmtMoney(row.total) + '</td>' +
         '</tr>';
-    }).join('') || '<tr><td class="py-4 text-sm text-slate-400" colspan="' + (meses.length + 2) + '">Sem dados para esta regional</td></tr>';
+    }).join('') || '<tr><td class="py-4 text-sm text-slate-400" colspan="' + (meses.length + 1) + '">Sem dados para esta regional</td></tr>';
   }
 
   function openListModal(title, html) {
