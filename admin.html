@@ -192,23 +192,59 @@
     var n = parseFloat(s);
     return isFinite(n) ? n : null;
   }
+  function pad2(n) { return String(n).padStart(2, '0'); }
+  function ymd(y, m, d) { return y + '-' + pad2(m) + '-' + pad2(d); }
+
   function parseDate(v) {
-    if (!v) return null;
-    if (Object.prototype.toString.call(v) === '[object Date]' && !isNaN(v)) {
-      return v.toISOString().slice(0, 10);
+    if (v === null || v === undefined || v === '') return null;
+
+    // Date object — componentes LOCAIS (evita virar dia anterior com toISOString)
+    if (Object.prototype.toString.call(v) === '[object Date]') {
+      if (isNaN(v.getTime())) return null;
+      return ymd(v.getFullYear(), v.getMonth() + 1, v.getDate());
     }
+
+    // Número serial do Excel
+    if (typeof v === 'number' && isFinite(v) && v > 20000 && v < 80000) {
+      var epoch = new Date(Date.UTC(1899, 11, 30));
+      epoch.setUTCDate(epoch.getUTCDate() + Math.floor(v));
+      return epoch.toISOString().slice(0, 10);
+    }
+
     var s = String(v).trim();
+    if (!s) return null;
+
+    // ISO: 2026-08-11 ou 2026-08-11T00:00:00
+    var iso = s.match(/^(\d{4})-(\d{2})-(\d{2})/);
+    if (iso) return iso[1] + '-' + iso[2] + '-' + iso[3];
+
+    // BR: 11/08/2026 ou 11-08-2026 ou 11.08.2026 (dia/mês/ano)
+    var br = s.match(/^(\d{1,2})[\/\-.](\d{1,2})[\/\-.](\d{2,4})/);
+    if (br) {
+      var dd = parseInt(br[1], 10), mm = parseInt(br[2], 10), yy = br[3];
+      if (yy.length === 2) yy = '20' + yy;
+      // se mês > 12, assumeu MM/DD → troca
+      if (mm > 12 && dd <= 12) { var tmp = dd; dd = mm; mm = tmp; }
+      if (mm >= 1 && mm <= 12 && dd >= 1 && dd <= 31) return ymd(yy, mm, dd);
+    }
+
+    // Serial como string
     if (/^\d+(\.\d+)?$/.test(s)) {
       var serial = parseFloat(s);
       if (serial > 20000 && serial < 80000) {
-        var epoch = new Date(Date.UTC(1899, 11, 30));
-        epoch.setUTCDate(epoch.getUTCDate() + Math.floor(serial));
-        return epoch.toISOString().slice(0, 10);
+        var ep = new Date(Date.UTC(1899, 11, 30));
+        ep.setUTCDate(ep.getUTCDate() + Math.floor(serial));
+        return ep.toISOString().slice(0, 10);
       }
     }
-    var br = s.match(/^(\d{1,2})\/(\d{1,2})\/(\d{4})/);
-    if (br) return br[3] + '-' + br[2].padStart(2, '0') + '-' + br[1].padStart(2, '0');
-    if (/^\d{4}-\d{2}-\d{2}/.test(s)) return s.slice(0, 10);
+
+    // Fallback: Date.parse (ex.: "Aug 11 2026", "Mon Aug 11 2026 ...")
+    var ms = Date.parse(s);
+    if (!isNaN(ms)) {
+      var dt = new Date(ms);
+      return ymd(dt.getFullYear(), dt.getMonth() + 1, dt.getDate());
+    }
+
     return null;
   }
   function normalizeMes(v, dataStr) {
@@ -271,8 +307,8 @@
       setProg(6, 'Parseando planilha…', 'Aguarde — arquivos grandes demoram');
       await yieldToUI();
 
-      var wb = XLSX.read(buf, { type: 'array', cellDates: true, raw: false });
-      var aoa = XLSX.utils.sheet_to_json(wb.Sheets[wb.SheetNames[0]], { header: 1, defval: null, raw: false });
+      var wb = XLSX.read(buf, { type: 'array', cellDates: true, cellText: false, raw: false });
+      var aoa = XLSX.utils.sheet_to_json(wb.Sheets[wb.SheetNames[0]], { header: 1, defval: null, raw: true });
       if (!aoa.length) throw new Error('Planilha vazia');
       var header = aoa[0].map(function (h) { return String(h || '').trim(); });
       var col = mapColumns(header);
