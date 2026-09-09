@@ -20,8 +20,15 @@
   var CACHE_TTL_MS = 30 * 60 * 1000; // 30 min
   var CACHE_PREFIX = 'painel_cache_v1:';
 
+  function baseVersion() {
+    try {
+      return localStorage.getItem('painel_atualizado_em') || '';
+    } catch (e) { return ''; }
+  }
+
   function cacheKey(name, params) {
-    return name + '::' + JSON.stringify(params || {});
+    // Versão da base na chave → após importação as chaves antigas param de bater
+    return baseVersion() + '|' + name + '::' + JSON.stringify(params || {});
   }
 
   function cacheGet(name, params) {
@@ -65,6 +72,7 @@
       Object.keys(localStorage).forEach(function (k) {
         if (k.indexOf(CACHE_PREFIX) === 0) localStorage.removeItem(k);
       });
+      // mantém painel_atualizado_em / painel_total_lanc — são a "versão" da base
     } catch (e) {}
   }
 
@@ -136,7 +144,7 @@
 
   async function rpc(name, params, opts) {
     opts = opts || {};
-    var skipCache = opts.skipCache || name === 'api_produto_detalhe';
+    var skipCache = opts.skipCache || name === 'api_produto_detalhe' || name === 'api_meta';
     if (!skipCache) {
       var hit = cacheGet(name, params);
       if (hit !== null && hit !== undefined) return hit;
@@ -162,7 +170,19 @@
     sb = window.supabase.createClient(window.SUPABASE_URL, window.SUPABASE_ANON_KEY);
     setLoading(true);
     try {
-      META = await rpc('api_meta');
+      META = await rpc('api_meta', {}, { skipCache: true });
+      // Detecta nova importação e invalida cache automaticamente (sem ação do usuário)
+      try {
+        var prev = localStorage.getItem('painel_atualizado_em') || '';
+        var prevTotal = localStorage.getItem('painel_total_lanc') || '';
+        var cur = META && META.atualizado_em ? String(META.atualizado_em) : '';
+        var curTotal = META && META.total != null ? String(META.total) : '';
+        if ((cur && prev !== cur) || (curTotal && prevTotal !== curTotal)) {
+          cacheClearAll();
+        }
+        if (cur) localStorage.setItem('painel_atualizado_em', cur);
+        if (curTotal) localStorage.setItem('painel_total_lanc', curTotal);
+      } catch (e) {}
       initFilters();
       if (el('header-sub')) el('header-sub').textContent = '';
       setAtualizado();

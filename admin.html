@@ -533,6 +533,12 @@
       var aprovado = checks.every(function (c) { return c.ok; });
 
       setProg(100, 'Concluído', '');
+      // Invalida cache do painel no mesmo navegador
+      try {
+        Object.keys(localStorage).forEach(function (k) {
+          if (k.indexOf('painel_cache_v1:') === 0 || k === 'painel_atualizado_em') localStorage.removeItem(k);
+        });
+      } catch (e) {}
       renderReport({
         lidas: dataRows.length, inseridos: totalIn, duplicados: totalDup, erros: totalErr,
         erros_detalhe: allErrs, file: file.name,
