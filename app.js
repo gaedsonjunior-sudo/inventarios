@@ -111,6 +111,8 @@
       p_loja: filters.loja || null,
       p_deptos: (filters.depto && filters.depto.length) ? filters.depto : null,
       p_mes: filters.mes || null,
+      p_data_ini: filters.data_ini || null,
+      p_data_fim: filters.data_fim || null,
       p_tipo: tipoLocal === 'ALL' ? null : tipoLocal,
       p_natureza: filters.natureza || null
     };
@@ -265,6 +267,11 @@
     filters.natureza = (el('f-natureza') && el('f-natureza').value) || '';
     filters.produto = (el('f-produto') && el('f-produto').value.trim()) || '';
     filters.depto = Array.from(document.querySelectorAll('.f-depto-cb:checked')).map(function (c) { return c.value; });
+    // inputs type=date devolvem YYYY-MM-DD (aceito pelo Postgres)
+    var di = el('f-data-ini') && el('f-data-ini').value;
+    var df = el('f-data-fim') && el('f-data-fim').value;
+    filters.data_ini = di ? di : null;
+    filters.data_fim = df ? df : null;
   }
 
   function clearFilters() {
@@ -273,6 +280,8 @@
       if (el(id)) el(id).value = '';
     });
     if (el('f-produto')) el('f-produto').value = '';
+    if (el('f-data-ini')) el('f-data-ini').value = '';
+    if (el('f-data-fim')) el('f-data-fim').value = '';
     document.querySelectorAll('.f-depto-cb').forEach(function (c) { c.checked = false; });
     fillLojasForRegional();
     refreshAll();
@@ -299,6 +308,10 @@
         if (k === 'depto') {
           filters.depto = [];
           document.querySelectorAll('.f-depto-cb').forEach(function (c) { c.checked = false; });
+        } else if (k === 'data_ini' || k === 'data_fim') {
+          filters[k] = null;
+          var dateId = k === 'data_ini' ? 'f-data-ini' : 'f-data-fim';
+          if (el(dateId)) el(dateId).value = '';
         } else {
           filters[k] = '';
           var map = { regional: 'f-regional', loja: 'f-loja', mes: 'f-mes', tipo: 'f-tipo', natureza: 'f-natureza', produto: 'f-produto' };
