@@ -418,6 +418,23 @@
     }).join('');
   }
 
+  function rankingTotalRow(list) {
+    var sumN = 0, sumT = 0, sumI = 0, sumTot = 0;
+    (list || []).forEach(function (row) {
+      sumN += Number(row.N) || 0;
+      sumT += Number(row.T) || 0;
+      sumI += Number(row.I) || 0;
+      sumTot += Number(row.total) || 0;
+    });
+    function cellBold(v) {
+      return '<td class="py-2 tabular-nums text-xs font-bold col-val ' + moneyClass(v) + '">' + fmtMoney(v) + '</td>';
+    }
+    return '<tr class="border-t-2 border-slate-300 bg-slate-50">' +
+      '<td class="py-2 pl-1 text-sm font-bold text-slate-900 col-name">Total</td>' +
+      cellBold(sumN) + cellBold(sumT) + cellBold(sumI) + cellBold(sumTot) +
+      '</tr>';
+  }
+
   function renderLojas(list) {
     list = (list || []).slice();
     var sort = (el('sort-lojas') && el('sort-lojas').value) || 'total_asc';
@@ -427,7 +444,7 @@
     cacheLojas = list;
     var tbody = el('rank-lojas');
     if (!tbody) return;
-    tbody.innerHTML = rankingRows(list, 'loja', 'data-filter-loja');
+    tbody.innerHTML = rankingRows(list, 'loja', 'data-filter-loja') + rankingTotalRow(list);
     tbody.querySelectorAll('[data-filter-loja]').forEach(function (row) {
       row.addEventListener('click', function () {
         filters.loja = row.dataset.filterLoja;
@@ -442,7 +459,7 @@
     cacheDeptos = list;
     var tbody = el('rank-deptos');
     if (!tbody) return;
-    tbody.innerHTML = rankingRows(list, 'depto', 'data-filter-depto');
+    tbody.innerHTML = rankingRows(list, 'depto', 'data-filter-depto') + rankingTotalRow(list);
     tbody.querySelectorAll('[data-filter-depto]').forEach(function (row) {
       row.addEventListener('click', function () {
         filters.depto = [row.dataset.filterDepto];
@@ -459,7 +476,7 @@
     cacheRegionais = list;
     var tbody = el('rank-regionais');
     if (!tbody) return;
-    tbody.innerHTML = rankingRows(list, 'regional', 'data-filter-reg');
+    tbody.innerHTML = rankingRows(list, 'regional', 'data-filter-reg') + rankingTotalRow(list);
     tbody.querySelectorAll('[data-filter-reg]').forEach(function (row) {
       row.addEventListener('click', function () {
         filters.regional = row.dataset.filterReg;
@@ -675,7 +692,7 @@
       '<th class="pb-2 font-medium col-val">Inv.</th>' +
       '<th class="pb-2 font-medium col-val">Total</th>' +
       '</tr></thead><tbody>' +
-      rankingRows(list, nameKey, 'data-x') +
+      rankingRows(list, nameKey, 'data-x') + rankingTotalRow(list) +
       '</tbody></table></div>';
   }
 
