@@ -687,7 +687,7 @@
     return '<div class="overflow-x-auto scrollbar-thin"><table class="rank-table w-full text-left">' +
       '<thead><tr class="text-[10px] text-slate-400 uppercase">' +
       '<th class="pb-2 font-medium col-name">' + nameLabel + '</th>' +
-      '<th class="pb-2 font-medium col-val">Normal</th>' +
+      '<th class="pb-2 font-medium col-val">Ajuste</th>' +
       '<th class="pb-2 font-medium col-val">TOP20</th>' +
       '<th class="pb-2 font-medium col-val">Inv.</th>' +
       '<th class="pb-2 font-medium col-val">Total</th>' +
@@ -728,7 +728,7 @@
 
   function exportCsv() {
     var rows = [];
-    rows.push(['Tipo', 'Nome', 'Normal', 'TOP20', 'Inv', 'Total'].join(';'));
+    rows.push(['Tipo', 'Nome', 'Ajuste', 'TOP20', 'Inv', 'Total'].join(';'));
     function add(tipo, list, key) {
       (list || []).forEach(function (r) {
         rows.push([tipo, r[key], r.N, r.T, r.I, r.total].join(';'));
