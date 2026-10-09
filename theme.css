@@ -102,6 +102,20 @@ main > .grid.grid-cols-2.lg\:grid-cols-4 { gap: 12px; }
   font-size: clamp(1rem, 1.4vw, 1.3rem) !important;
   line-height: 1.35 !important;
 }
+/* O contêiner dos KPIs acompanha o canvas; somente cada card permanece branco. */
+main > section.grid.grid-cols-2.lg\:grid-cols-4 {
+  background: var(--canvas) !important;
+  border: 0 !important;
+  border-radius: 0 !important;
+  box-shadow: none !important;
+}
+/* Preserva o semáforo de valores aplicado pela lógica já existente. */
+.kpi-card .kpi-value.text-falta,
+table.rank-table td.text-falta,
+table.matriz-table td.text-falta { color: var(--danger) !important; }
+.kpi-card .kpi-value.text-sobra,
+table.rank-table td.text-sobra,
+table.matriz-table td.text-sobra { color: var(--success) !important; }
 main section > div.border-b {
   border-color: #e8edf4 !important;
   background: linear-gradient(90deg, #f8faff 0%, #fff 100%);
@@ -202,6 +216,11 @@ table.rank-table tbody tr:last-child td, table.matriz-table tbody tr:last-child 
   color: var(--navy-900);
   font-weight: 700;
 }
+/* As cores semânticas das células têm prioridade também na linha de total. */
+table.rank-table tbody tr:last-child td.text-falta,
+table.matriz-table tbody tr:last-child td.text-falta { color: var(--danger) !important; }
+table.rank-table tbody tr:last-child td.text-sobra,
+table.matriz-table tbody tr:last-child td.text-sobra { color: var(--success) !important; }
 table.matriz-table th.sticky, table.matriz-table td.sticky { background: #f7faff !important; }
 #rank-faltas button, #rank-sobras button {
   padding: 10px 13px !important;
