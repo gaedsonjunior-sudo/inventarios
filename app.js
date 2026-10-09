@@ -435,6 +435,15 @@
       '</tr>';
   }
 
+  function sortRanking(list, selectId, nameKey) {
+    list = (list || []).slice();
+    var sort = (el(selectId) && el(selectId).value) || 'total_asc';
+    if (sort === 'total_asc') list.sort(function (a, b) { return a.total - b.total; });
+    else if (sort === 'total_desc') list.sort(function (a, b) { return b.total - a.total; });
+    else list.sort(function (a, b) { return String(a[nameKey]).localeCompare(String(b[nameKey])); });
+    return list;
+  }
+
   function renderLojas(list) {
     list = (list || []).slice();
     var sort = (el('sort-lojas') && el('sort-lojas').value) || 'total_asc';
@@ -455,7 +464,7 @@
   }
 
   function renderDeptos(list) {
-    list = (list || []).slice().sort(function (a, b) { return a.total - b.total; });
+    list = sortRanking(list, 'sort-deptos', 'depto');
     cacheDeptos = list;
     var tbody = el('rank-deptos');
     if (!tbody) return;
@@ -472,7 +481,7 @@
   }
 
   function renderRegionais(list) {
-    list = (list || []).slice().sort(function (a, b) { return a.total - b.total; });
+    list = sortRanking(list, 'sort-regionais', 'regional');
     cacheRegionais = list;
     var tbody = el('rank-regionais');
     if (!tbody) return;
@@ -765,6 +774,8 @@
   if (el('btn-clear')) el('btn-clear').addEventListener('click', clearFilters);
   if (el('btn-export')) el('btn-export').addEventListener('click', exportCsv);
   if (el('sort-lojas')) el('sort-lojas').addEventListener('change', function () { renderLojas(cacheLojas); });
+  if (el('sort-regionais')) el('sort-regionais').addEventListener('change', function () { renderRegionais(cacheRegionais); });
+  if (el('sort-deptos')) el('sort-deptos').addEventListener('change', function () { renderDeptos(cacheDeptos); });
   if (el('top-n-faltas')) el('top-n-faltas').addEventListener('change', function () { refreshAll(); });
   if (el('top-n-sobras')) el('top-n-sobras').addEventListener('change', function () { refreshAll(); });
   if (el('modal-close')) el('modal-close').addEventListener('click', closeModal);
